@@ -1,0 +1,287 @@
+---
+title: "`r params$doc_title`"
+subtitle: "`r params$doc_subtitle`"
+author: "Biometrics Group, IRRI"
+date: "`r format(Sys.time(), '%Y %B %d')`"  
+# date last modified: 2022 June 28
+params:
+  phenoDTfile: !r c("metjgwee88298")
+  deregress: TRUE
+  size: "std.error"
+  color: "fieldinst"
+  text: "geno"
+  outputPath: !r here::here("Result")
+  doc_title: "Visualization of predictions"
+  doc_subtitle: "Version 2.1"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: 
+      collapsed: FALSE
+      smooth_scroll: FALSE
+---
+
+<style>
+.main-container {
+margin-left: 0;
+margin-right: auto;
+}
+.tab-content {
+margin-bottom: 50px;
+}
+</style>
+
+```{r setup, include = FALSE}
+
+# knitr R markdown chunk options
+knitr::opts_chunk$set(dependson = knitr::all_labels(),
+                      echo = FALSE,
+                      cache = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      comment = NA,
+                      out.width = "100%",
+                      error = TRUE)
+options(knitr.kable.NA = '', knitr.duplicate.label = "allow")
+
+# loading necessary R packages ####
+## data manipulation
+# library(dplyr)      # %>%, data cleaning functions
+library(tidyr)      # pivot_()
+# library(magrittr)   # %<>%, coerce col to factors or numeric
+# library(stringr)    # str_detect()
+# library(data.table) # %Like%
+# library(scales)     # rescale data between to values
+library(cgiarBase)
+
+## outputs - graphs, tables
+# library(ggplot2)    # ggplot(), etc.
+# library(DT)         # datatable()
+# library(knitr)      # kable()
+library(kableExtra) # kable_styling(), etc.
+# library(viridis)    # scale_fill_viridis()
+# # library(gge)        # gge(), biplot()
+# library(tidymodels) # for the fit() function
+library(plotly)     # ggplotly()
+# library(htmltools)  # tagList()
+
+## parallel computing
+# library(foreach)    # foreach(), %dopar%, etc.
+# library(doParallel) # registerDoParallel()
+
+```
+
+
+```{r dataLoading, include = FALSE}
+# loading the dataset
+if (is.null(params$phenoDTfile)) stop("No input phenotypic data file specified.")
+mydata <- read.csv(file.path("predictions.csv"))
+useAna <- which(mydata$analysis.id %in% params$phenoDTfile)
+if(length(useAna) == 0){stop("No predictions found under this phenoDTfile.", call. = FALSE)}
+mydata <- mydata[useAna,]
+mydata <- mydata[which(mydata$geno.type == "test"),]
+
+```
+
+*** 
+
+```{r xxx, include = TRUE}
+cat(paste("Analysing dataset with id(s):", paste(params$phenoDTfile, collapse = ", ")))
+
+```
+
+### Prediction scatterplots
+
+Trait by trait scatterplot 
+
+```{r visual2, results = 'asis'}
+# , fig.dim = c(6, 12)
+p2 <- list()
+mydataSplit0 <- split(mydata, mydata$analysis.id)
+
+for(kD in 1:length(mydataSplit0)){
+  mydataSplit <- mydataSplit0[[kD]]
+  mydataSplit$trait2 <- mydataSplit$trait
+  trait2 <- unique(mydataSplit$trait2)
+  
+  combos <- expand.grid(trait2,trait2)
+  combos <- combos[!duplicated(t(apply(combos,1,sort))),]
+  combos <- combos[-which(combos[,1] == combos[,2]),]
+  
+  if(nrow(combos) > 0){
+    listTrace <- buttons <- list()
+  
+  tt <- rep(FALSE, nrow(combos)); 
+  tt2 <- rep(TRUE, nrow(combos));
+  buttons[[1]] <- list(
+    args = list("visible", tt2), 
+    label = "All", 
+    method = "restyle"
+  )
+  
+  for(j in 1:nrow(combos)){
+    
+    listTrace[[j]] <- list(
+      line = list(
+        color = "#FFD700", 
+        width = 3
+      ), 
+      name = paste0("X-AX: ",as.character(combos[j,1]), " | Y-AX: ", as.character(combos[j,2])), 
+      type = "scatter", 
+      x = mydataSplit[which(mydataSplit$trait2 == as.character(combos[j,1])),"predicted.value"], 
+      y = mydataSplit[which(mydataSplit$trait2 == as.character(combos[j,2])),"predicted.value"],
+      text=mydataSplit[which(mydataSplit$trait2 == as.character(combos[j,2])),params$text],
+      size=1/scale(mydataSplit[which(mydataSplit$trait2 == as.character(combos[j,2])),params$size]),
+      color=mydataSplit[which(mydataSplit$trait2 == as.character(combos[j,2])),params$color]
+    )
+    tt2 <- tt
+    tt2[j] <- TRUE
+    buttons[[j+1]] <- list(
+      args = list("visible", tt2), 
+      label = paste0("X-AX: ",as.character(combos[j,1]), " | Y-AX: ", as.character(combos[j,2])), 
+      method = "restyle"
+    )
+    
+  }
+  layout <- list(
+    #title = "Predictions scatterplot (2-traits)", 
+    xaxis = list(domain = c(0.1, 1), title="Prediction value X-AX"),
+    yaxis = list(title = "Prediction value Y-AX"),
+    updatemenus = list(
+      list(
+        x = 0.65, 
+        y = 1.5, 
+        buttons = buttons, 
+        yanchor = "top"
+      )
+    )
+  )
+  
+  p <- plot_ly()
+  for(j in 1:nrow(combos)){ # line=listTrace[[j]]$line,  , text=listTrace[[j]]$text
+    p <- add_markers(p, name=listTrace[[j]]$name, type=listTrace[[j]]$type, x=listTrace[[j]]$x, 
+                     y=listTrace[[j]]$y, #showlegend = FALSE,
+                     text=listTrace[[j]]$text, 
+                     size=listTrace[[j]]$size, 
+                     color=listTrace[[j]]$color)
+  }
+  p <- layout(p, title=layout$title, updatemenus=layout$updatemenus,
+              xaxis = layout$xaxis,# height=1000,
+              yaxis = layout$yaxis
+  )
+  p2[[kD]] <- p
+  }
+  
+}
+if(length(p2) > 0){
+  subplot(p2, nrows=length(p2))#, heights = c(0.6, 0.4))
+}
+
+```
+
+### Genetic gain summary
+
+```{r dataChecking, include=TRUE}
+mydata$trait <- paste(mydata$trait,mydata$fieldinst,mydata$analysis.id,sep="_")
+trait <- unique(mydata$trait)
+
+if(params$deregress){
+  mydata$predicted.value.d <- mydata$predicted.value/mydata$rel
+}else{
+  mydata$predicted.value.d <- mydata$predicted.value
+}
+
+
+r2 <- pval <- b0 <- b1 <- b1p <- numeric()
+for(j in 1:length(trait)){ # for loop for genetic gain regressions
+  mod <- lm(mydata[which(mydata$trait == trait[j]),"predicted.value.d"] ~ mydata[which(mydata$trait == trait[j]),"geno.year.origin"])
+  sm <- summary(mod)
+  baseline <- mod$coefficients[1] + mod$coefficients[2]*min(mydata[which(mydata$trait == trait[j]),"geno.year.origin"])
+  b1p[j] <- round((mod$coefficients[2]/baseline) * 100,3)
+  r2[j] <- round(sm$r.squared,3)
+  b1[j] <- round(mod$coefficients[2],3 )
+  b0[j] <- round(mod$coefficients[1],3 )
+  pval[j] <- round(1 - pf(sm$fstatistic[1], df1=sm$fstatistic[2], df2=sm$fstatistic[3]) ,4)
+}
+summaryInfo2 <- tribble(
+  ~cat, ~val,
+  "**Trait**", paste(trait, collapse = ", "),
+  "**% Genetic gain**", paste0(b1p, collapse = ", "),
+  "**R2**", paste0(r2, collapse = ", "),
+  "**Intercept**", paste0(b0, collapse = ", "),
+  "**Slope**", paste0(b1, collapse = ", "),
+  "**P-value**", paste0(pval, collapse = ", ")
+  
+)
+names(summaryInfo2) <- c("", "")
+kable(summaryInfo2) %>% kable_styling(full_width = F)
+
+```
+
+### Prediction vs Year-of-origin plots
+
+Using predictions across environments regressed on the year of origin. 
+
+```{r visual, results = 'asis'}
+listTrace <- buttons <- list()
+tt <- rep(FALSE, length(trait)); names(tt) <- trait
+
+tt2 <- rep(TRUE, length(trait));
+buttons[[1]] <- list(
+  args = list("visible", tt2), 
+  label = "All", 
+  method = "restyle"
+)
+for(j in 1:length(trait)){
+  
+  mod <- lm(mydata[which(mydata$trait == trait[j]),"predicted.value.d"] ~ mydata[which(mydata$trait == trait[j]),"geno.year.origin"])
+  sm <- summary(mod)
+  baseline <- mod$coefficients[1] + mod$coefficients[2]*min(mydata[which(mydata$trait == trait[j]),"geno.year.origin"])
+  ggp <- (mod$coefficients[2]/baseline) * 100
+  mt <- paste("R2=",round(sm$r.squared,3),":B1%=",round(ggp,3),": B1=",round(mod$coefficients[2],3 ),": B0=",round(mod$coefficients[1],3 ))
+  
+  listTrace[[j]] <- list(
+    line = list(
+      color = "#FFD700", 
+      width = 3
+    ), 
+    name = trait[j], 
+    type = "box", 
+    x = mydata[which(mydata$trait == trait[j]),"geno.year.origin"], 
+    y = mydata[which(mydata$trait == trait[j]),"predicted.value.d"],
+    text=mt
+  )
+  tt2 <- tt
+  tt2[j] <- TRUE
+  buttons[[j+1]] <- list(
+    args = list("visible", tt2), 
+    label = trait[j], 
+    method = "restyle"
+  )
+  
+}
+layout <- list(
+  title = "Predictions across years", 
+  xaxis = list(domain = c(0.1, 1), title="Year of origin"),
+  yaxis = list(title = "Prediction value"),
+  updatemenus = list(
+    list(
+      x = 0.45, 
+      y = 1.5, 
+      buttons = buttons, 
+      yanchor = "top"
+    )
+  )
+)
+
+p <- plot_ly()
+for(j in 1:length(trait)){
+  p <- add_boxplot(p, line=listTrace[[j]]$line, name=listTrace[[j]]$name, type=listTrace[[j]]$type, x=listTrace[[j]]$x, y=listTrace[[j]]$y, text=listTrace[[j]]$text)
+}
+p <- layout(p, title=layout$title, updatemenus=layout$updatemenus)
+p
+
+```
+
+

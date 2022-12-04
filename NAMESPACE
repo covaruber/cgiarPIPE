@@ -1,0 +1,10 @@
+importFrom("grDevices", "dev.cur", "dev.new", "dev.next", "dev.set")
+importFrom("graphics", "axis", "lines", "par", "points", "title")
+importFrom("stats", "cov", "dist", "median", "model.matrix", "optimize", "pbeta", "ppoints", "predict", "smooth.spline","var")
+export(cleanp, sta, met, index, rgg, pgg,
+       cleanm, grm, ocs,
+       traitNames, preds, metrics,
+       idGenerator, setDB, desire
+       )
+
+

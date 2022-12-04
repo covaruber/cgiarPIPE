@@ -1,0 +1,152 @@
+---
+title: "`r params$doc_title`"
+subtitle: "`r params$doc_subtitle`"
+author: "Biometrics Group, IRRI"
+date: "`r format(Sys.time(), '%Y %B %d')`"  
+# date last modified: 2022 June 28
+params:
+  phenoDTfile: !r c("staslhzx01347","stasqdap16930","stamswvc43789","stalhncq03740","statvfrh34220","stavwdto78948","stavmmxa16880") #c("gegfchxu59984","gegurtzd34030")
+  outputPath: !r here::here("Result")
+  doc_title: "Visualization of pipeline metrics"
+  doc_subtitle: "Version 2.1"
+output: 
+  html_document:
+    toc: TRUE
+    toc_depth: 4
+    toc_float: 
+      collapsed: FALSE
+      smooth_scroll: FALSE
+---
+
+<style>
+.main-container {
+margin-left: 0;
+margin-right: auto;
+}
+.tab-content {
+margin-bottom: 50px;
+}
+</style>
+
+```{r setup, include = FALSE}
+
+# knitr R markdown chunk options
+knitr::opts_chunk$set(dependson = knitr::all_labels(),
+                      echo = FALSE,
+                      cache = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      comment = NA,
+                      out.width = "100%",
+                      error = TRUE)
+options(knitr.kable.NA = '', knitr.duplicate.label = "allow")
+
+# loading necessary R packages ####
+library(cgiarBase)
+library(plotly)     # ggplotly()
+
+```
+
+
+```{r dataLoading, include = FALSE}
+# loading the dataset
+if (is.null(params$phenoDTfile)) stop("No input phenotypic data file specified.")
+mydata <- read.csv(file.path("pipeline_metrics.csv"))
+useAna <- which(mydata$analysis.id %in% params$phenoDTfile)
+if(length(useAna) == 0){stop("No values found under this phenoDTfile.", call. = FALSE)}
+mydata <- mydata[useAna,]
+# mydata$parameter <- paste(mydata$parameter,mydata$analysis.id,sep="_")
+trait <- unique(mydata$parameter)
+mydata$pipeline.id <- paste(mydata$pipeline.id, mydata$analysis.id, sep="_")
+mydata$fieldinst <- paste(mydata$parameter, mydata$analysis.id, mydata$fieldinst)
+mydata$text <- mydata$fieldinst #paste(mydata$analysis.id, mydata$fieldinst)
+```
+
+*** 
+
+```{r xxx, include = TRUE}
+cat(paste("Analysing dataSET with id(s):", paste(params$phenoDTfile, collapse = ", ")))
+
+```
+
+### Pipeline metrics summary
+
+```{r dataChecking, include=TRUE}
+
+printTable(mydata, caption = "using the cleaned dataset")
+
+```
+
+### Metric value ~ trait 
+
+Using pipeline metrics from the database. 
+
+```{r visual, results = 'asis'}
+# , fig.dim = c(6, 18)
+p2 <- list()
+mydataSplit0 <- split(mydata, mydata$pipeline.id)
+
+for(kD in 1:length(mydataSplit0)){
+  mydataSplit <- mydataSplit0[[kD]]
+  listTrace <- listTrace2 <- buttons <- buttons2 <- list()
+  tt <- rep(FALSE, length(trait)); names(tt) <- trait
+  
+  tt2 <- rep(TRUE, length(trait))
+  buttons[[1]] <- list(
+    args = list("visible", tt2), 
+    label = "All", 
+    method = "restyle"
+  )
+  
+  for(j in 1:length(trait)){
+    
+    listTrace[[j]] <- list(
+      name = trait[j], 
+      type = "bar", 
+      x = mydataSplit[which(mydataSplit$parameter == trait[j]),"trait"], 
+      y = mydataSplit[which(mydataSplit$parameter == trait[j]),"value"],
+      text=mydataSplit[which(mydataSplit$parameter == trait[j]),"text"],
+      color= mydataSplit[which(mydataSplit$parameter == trait[j]),"fieldinst"] # cols[as.factor(mydataSplit[which(mydataSplit$parameter == trait[j]),"fieldinst"])] #
+    )
+    tt2 <- tt
+    tt2[j] <- TRUE
+    buttons[[j+1]] <- list(
+      args = list("visible", tt2), 
+      label = trait[j], 
+      method = "restyle"
+    )
+    
+  }
+  
+  layout <- list(
+    title = "Values split by pipeline and analysis", 
+    xaxis = list(domain = c(0.1, 1), title="Year of origin"),
+    yaxis = list(title = "Prediction value"),
+    showlegend = FALSE,
+    updatemenus = list(
+      list(
+        x = 0.45, 
+        y = 1.5, 
+        buttons = buttons, 
+        yanchor = "top"
+      )
+    )
+  )
+  
+  p <- plot_ly()
+  for(j in 1:length(trait)){ # line=listTrace[[j]]$line, 
+    p <- add_bars(p, name=listTrace[[j]]$name, type=listTrace[[j]]$type, x=listTrace[[j]]$x, 
+                  y=listTrace[[j]]$y, text=listTrace[[j]]$text, showlegend = FALSE, 
+                  text=listTrace[[j]]$text, color=listTrace[[j]]$color)
+  }
+  p <- layout(p, title=layout$title, updatemenus=layout$updatemenus,
+              xaxis = list(domain = c(0.1, 1), title="Trait of interest"),
+              height=1000,
+              yaxis = list(title = "Metric value")
+  )
+  p2[[kD]] <- p
+}
+subplot(p2, nrows=length(p2))
+```
+
+
