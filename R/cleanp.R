@@ -3,7 +3,7 @@ cleanp <- function(
   stage= "ABSCENT", year= "ABSCENT", season= "ABSCENT",
   location= "ABSCENT", country= "ABSCENT",
   trial= "ABSCENT", design= "ABSCENT",geno= "ABSCENT",
-  genoCode="ABSCENT", genoYearOrigin="ABSCENT", 
+  genoCode="ABSCENT", genoYearOrigin="ABSCENT",
   rep= "ABSCENT", block= "ABSCENT",rowcoord= "ABSCENT",
   colcoord= "ABSCENT",entryType= "ABSCENT",
   # trait parameters
@@ -22,16 +22,9 @@ cleanp <- function(
   traitLB <- rep(traitLB,100); traitLB <- traitLB[1:length(trait)]
   traitUB <- rep(traitUB,100); traitUB <- traitUB[1:length(trait)]
   id <- paste("clp",idGenerator(5,5),sep="")
-  type <- "cleaningp" 
+  type <- "cleaningp"
   ###################################
-  # loading necessary R packages ####
-  # library(dplyr)      # %>%, data cleaning functions
-  # library(tidyr)      # pivot_()
-  # library(magrittr)   # %<>%, coerce col to factors or numeric
-  # library(stringr)    # str_detect()
-  # library(data.table) # %Like%
-  library(cgiarBase) # biometrics for cgiar
-  
+
   ###################################
   ## shape the data
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
@@ -40,28 +33,28 @@ cleanp <- function(
   # parameters <- read.csv(file.path(wd,"parameters.csv"))
   # modeling <- read.csv(file.path(wd,"modeling.csv"))
   # defining the columns to be present - checking of params
-  datacolparams <- c("pipeline","year", "season", "location", "country", "trial", "design", 
-                     "geno", "genoCode","genoYearOrigin","rep", "block", "rowcoord", "colcoord", "entryType", "stage") 
+  datacolparams <- c("pipeline","year", "season", "location", "country", "trial", "design",
+                     "geno", "genoCode","genoYearOrigin","rep", "block", "rowcoord", "colcoord", "entryType", "stage")
   provided <- c(pipeline,year, season, location, country, trial, design, geno, genoCode, genoYearOrigin, rep, block, rowcoord, colcoord, entryType, stage)
   counter=1
   for(j in 1:16){ # we check parameters belonging to data columns
     if(provided[j] == "ABSCENT"){ # if column doesn't exist
       if(datacolparams[j] %in% c("rep", "block", "rowcoord", "colcoord","year","genoYearOrigin")){ # if abscent column should be numeric
-        mydata[,datacolparams[counter]] <- 1 
+        mydata[,datacolparams[counter]] <- 1
       }else{# if abscent column should be character
-        mydata[,datacolparams[counter]] <- paste("dummy",datacolparams[counter],sep="_") 
+        mydata[,datacolparams[counter]] <- paste("dummy",datacolparams[counter],sep="_")
       }
     }else{ # if it does exist
       if (!provided[j] %in% colnames(mydata)){
         stop(paste0("'", provided[j], "' is not a column in the given dataset or you have repeated a column name"))
       }else{
         mydata[,datacolparams[j]] <- mydata[,provided[j]]
-        # colnames(mydata) <- replaceValues(colnames(mydata),provided[j], datacolparams[counter]) 
+        # colnames(mydata) <- replaceValues(colnames(mydata),provided[j], datacolparams[counter])
         if(datacolparams[j] %in% c("rep", "block", "rowcoord", "colcoord")){
           mydata[,datacolparams[j]] <- gsub('[^[:digit:] ]', '', mydata[,datacolparams[j]]) # leave only digits
           mydata[,datacolparams[j]] <- as.numeric(mydata[,datacolparams[j]])
         }
-      } 
+      }
     }; counter=counter+1
   }
   # check if traits are present
@@ -72,10 +65,10 @@ cleanp <- function(
       mydata[,trait[k]] <- as.numeric(mydata[,trait[k]])
     }
   }
-  
+
   # subset to relevant columns
   mydatan <- mydata[,c(datacolparams,trait)]
-  # make sure fieldinst or fieldinst columns don't have messy identifiers 
+  # make sure fieldinst or fieldinst columns don't have messy identifiers
   for(iPar in setdiff(fieldinst,"year")){
     mydatan[,iPar] <- gsub(" ","_",mydatan[,iPar])
   }
@@ -94,15 +87,15 @@ cleanp <- function(
   mydatan[,"fieldinstF"] <- gsub(" ",".",mydatan[,"fieldinstF"])
   mydatan[,"fieldinstF"] <- as.factor(mydatan[,"fieldinstF"])
   mydatan[,"rowindex"] <- 1:nrow(mydatan)
-  
+
   # identifying checks for further analysis
   checks <- unique(mydatan[which(mydatan[, "entryType2"] != "test"), "geno"])
-  
+
   ######################################
   ## clean the data
   # removing outliers by fieldinst
   mydata_cleaned <- mydatan
-  
+
   if(!is.null(trait)){
     outList <- list(); counter=1
     for (j in 1:length(trait)) {
@@ -144,7 +137,7 @@ cleanp <- function(
   # write.csv(parameters, file = file.path(wd,"parameters.csv"),row.names = FALSE)
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
-    trait = trait,traitLb = NA, traitUb = NA, 
+    trait = trait,traitLb = NA, traitUb = NA,
     outlierCoef = outlierCoef, analysisId = id,
     analysisType = type, fixedModel = NA,randomModel = NA,
     residualModel = NA,h2Threshold = NA
@@ -152,7 +145,7 @@ cleanp <- function(
   saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
   # modeling <- unique(rbind(modeling, mod[,colnames(modeling)]))
   # write.csv(modeling, file = file.path(wd,"modeling.csv"),row.names = FALSE)
-  
+
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     cat(paste("Your results will be available in the 'files_cleaned' folder under such id \n"))

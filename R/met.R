@@ -13,26 +13,22 @@ met <- function(
     scaledDesire=TRUE,
     wd=NULL, verbose=TRUE
 ){
-  
+
   if(is.null(wd)){wd <- getwd()}
   md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-  
+
   id <- paste("met",idGenerator(5,5),sep="")
-  type <- "met" 
+  type <- "met"
   if(is.null(phenoDTfile)){stop("Please provide the name of the analysis to locate the predictions", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-  
-  library(cgiarBase) # biometrics for cgiar
-  library(cgiarFTDA)
-  library(asreml)
-  
+
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
   pipeline_metrics <- readRDS(file.path(wd,"metrics",paste0(phenoDTfile)))
-  
+
   utraits <- unique(mydata$trait)
   traitToRemove <- character()
   for(k in 1:length(trait)){
@@ -69,7 +65,7 @@ met <- function(
     pipeline_metricsSub <- pipeline_metrics[which(pipeline_metrics$trait == iTrait & pipeline_metrics$parameter == "H2"),]
     goodFields <- pipeline_metricsSub[which((pipeline_metricsSub$value > heritLB) & (pipeline_metricsSub$value < heritUB)),"fieldinst"]
     mydataSub <- mydataSub[which(mydataSub$fieldinst %in% goodFields),]
-    
+
     mydataSub$genoF <- as.factor(mydataSub$geno)
     mydataSub$fieldinstF <- as.factor(mydataSub$fieldinst)
     mydataSub$pipelineF <- as.factor(mydataSub$pipeline)
@@ -81,14 +77,14 @@ met <- function(
     #   mydataSub[,paste0(fixedTerm[fi],"F")] <- as.factor(mydataSub[,fixedTerm[fi]])
     # }
     # fixedTerm2 <- paste0(fixedTerm,"F")
-    
+
     # mydataSub$genoF <- as.factor(mydataSub$geno)
     # mydataSub$
     # do analysis
     if(!is.na(var(mydataSub[,"predictedValue"],na.rm=TRUE))){ # if there's variance
       if( var(mydataSub[,"predictedValue"], na.rm = TRUE) > 0 ){
         checks <- mydataSub[which(mydataSub[,"genoType"] == "check"),"geno"]
-        
+
         if(!is.null(interactionsWithGeno)){
           interacs <- expand.grid("genoF",interactionsWithGeno)
           interacs<- as.data.frame(interacs[which(as.character(interacs[,1]) != as.character(interacs[,2])),])
@@ -116,7 +112,7 @@ met <- function(
         }else{
           ranres <- "~units"
         }
-        
+
         mydataSub=mydataSub[with(mydataSub, order(fieldinstF)), ]
         mydataSub$w <- 1/(mydataSub$stdError^2)
         if(verbose){
@@ -124,7 +120,7 @@ met <- function(
           cat(ranran,"\n")
         }
         # mydataSub2 <- mydataSub[which(mydataSub$predictedValue > 0),]
-        mix <- try( 
+        mix <- try(
           asreml(as.formula(fix),
                  random= as.formula(ranran),
                  sparse = as.formula(spar),
@@ -145,7 +141,7 @@ met <- function(
           pp$rel <- 1 - (pp$stdError^2 / (2*sum(summary(mix)$varcomp[1:2,1])))
           ## heritabilities
           h2Pred <- 1 - pp0$avsed/(2*sum(summary(mix)$varcomp[1:2,1]))
-          h2[counter] <- h2Pred; h2.se[counter] <- NA 
+          h2[counter] <- h2Pred; h2.se[counter] <- NA
           ## genetic variances
           vg[counter] <- sum(summary(mix)$varcomp[1:2,1]); vg.se[counter] <- sum(summary(mix)$varcomp[1:2,2])
         }else{
@@ -154,8 +150,8 @@ met <- function(
           pp$stdError <- 0
           pp$status <- "Aggregated"
           pp$rel <- 0
-          ## heritabilities # h2Pred <- abs(round(mean(1 - (pp$stdError^2 / sum(summary(mix)$varcomp[1:2,1]))), 3)) 
-          h2[counter] <- 0; h2.se[counter] <- NA 
+          ## heritabilities # h2Pred <- abs(round(mean(1 - (pp$stdError^2 / sum(summary(mix)$varcomp[1:2,1]))), 3))
+          h2[counter] <- 0; h2.se[counter] <- NA
           ## genetic variances
           vg[counter] <- 0; vg.se[counter] <- 0
         }
@@ -163,7 +159,7 @@ met <- function(
         pp$fieldinstF <- "across"
         pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
         if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
-        predictionsList[[counter]] <- pp; 
+        predictionsList[[counter]] <- pp;
         ## cycle times
         genoCodes <- unique(mydataSub$genoCode)
         crossYears <- as.numeric(substr(as.character(as.numeric(gsub('[^[:digit:] ]', '', genoCodes) )),start=1, stop=2))
@@ -173,7 +169,7 @@ met <- function(
         your.year <- as.numeric(substr(year.mo.day[1],3,4))
         crossYears2 <- as.numeric(paste0(ifelse(crossYears < your.year, "20","19"), as.character(crossYears)))
         cl[counter] <- abs(mean(mydataSub$genoYearOrigin, na.rm=TRUE) - mean(crossYears2, na.rm=TRUE))
-        cl.se[counter] <- NA 
+        cl.se[counter] <- NA
         ## mean
         mu[counter] <- mean(pp$predictedValue, na.rm=TRUE)
         ## others
@@ -234,7 +230,7 @@ met <- function(
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
     geno = NA,  rep	= NA,  block =	NA,
-    rowcoord =	NA,  colcoord = NA,  
+    rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
@@ -252,23 +248,23 @@ met <- function(
     h2Threshold = paste(c(heritLB,heritUB),collapse=" , ")
   )
   saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-  
+
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-  
+
   # write pipeline metrics
-  pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(NA,length(mu))), 
+  pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(NA,length(mu))),
                    fieldinst=c(field,field,field),  trait=c(trt,trt,trt),
                    analysisId=id, method=c(rep("cullis",length(h2)),rep("reml",length(vg)), rep("mean",length(mu)) ),
-                   traitUnits=NA, parameter=c(rep("H2",length(h2)),rep("VG",length(vg)), rep("mean",length(mu)) ), 
+                   traitUnits=NA, parameter=c(rep("H2",length(h2)),rep("VG",length(vg)), rep("mean",length(mu)) ),
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", "),
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
   # save desire file
-  desire(trait=trait,h2=h2, G=G, 
+  desire(trait=trait,h2=h2, G=G,
          pathFile=file.path(wd,"desire",paste0("desire_",id,".txt"))
   )
   ##

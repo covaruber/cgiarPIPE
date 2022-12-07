@@ -7,41 +7,37 @@ rgg <- function(
     partition=FALSE,
     wd=NULL, verbose=TRUE
 ){
-  
+
   if(is.null(wd)){wd <- getwd()}
   md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-  
+
   id <- paste("rgg",idGenerator(5,5),sep="")
-  type <- "rgg" 
+  type <- "rgg"
   if(is.null(phenoDTfile)){stop("Please provide the name of the analysis to locate the predictions", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-  
-  library(cgiarBase) # biometrics for cgiar
-  library(cgiarFTDA)
-  library(asreml)
-  
+
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   parameters <- readRDS(file.path(wd,"metadata",paste0(phenoDTfile)))
   mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
-  
+
   current.anid <- unique(mydata$analysisId)
   past.anid <- parameters[which(parameters$analysisId %in% current.anid),"phenoDataFile"]
   mydata2 <- readRDS(file.path(wd,"predictions",paste0(past.anid)))
-  
+
   if(length(unique(mydata$genoYearOrigin)) == 1){stop("Only one year of data. Realized genetic gain analysis cannot proceed.", call. = FALSE)}
   ############################
   ## gg analysis
-  gg <- ggp <- inter <- gg.y1 <- gg.yn <- segp <- seb1 <- seb0 <- r2 <- pv <- ntrial <- ntrial.se <- numeric(); 
+  gg <- ggp <- inter <- gg.y1 <- gg.yn <- segp <- seb1 <- seb0 <- r2 <- pv <- ntrial <- ntrial.se <- numeric();
   field <- trt <- vector()
   counter=1
   for(iTrait in trait){ # iTrait="GYKGPHA"
     if(verbose){
       cat(paste("Analyzing trait", iTrait,"\n"))
     }
-    
+
     # subset data
     mydataSub <- droplevels(mydata[which(mydata$trait == iTrait),])
     mydataSub$fieldinstF <- as.factor(mydataSub$fieldinst)
@@ -61,7 +57,7 @@ rgg <- function(
         ranres <- "~units"#"~dsum(~units | fieldinstF)"
         mydataSub=mydataSub[with(mydataSub, order(fieldinstF)), ]
         mydataSub$w <- 1/(mydataSub$stdError)
-        
+
         hh<-split(mydataSub,mydataSub$genoYearOrigin)
         hh <- lapply(hh,function(x){
           outlier <- boxplot.stats(x=x[, "predictedValue"],coef=1.5 )$out
@@ -69,7 +65,7 @@ rgg <- function(
           if(length(bad) >0){out <- x[-bad,]}else{out<-x}
           return(out)
         })
-        
+
         if(partition){
           p1 <- p2 <- p3 <- p4 <- p5 <- p6 <- p7 <- p8 <- numeric();cc <- 1
           for(u in 1:(length(hh))){
@@ -94,7 +90,7 @@ rgg <- function(
           }
           gg[counter] <- mean(p1, na.rm=TRUE); ggp[counter] <- mean(p2, na.rm=TRUE); segp[counter] <- mean(p3, na.rm=TRUE)
           inter[counter] <- mean(p4, na.rm=TRUE); seb1[counter] <- mean(p5, na.rm=TRUE); seb0[counter] <- mean(p6, na.rm=TRUE)
-          r2[counter] <- mean(p7, na.rm=TRUE); pv[counter] <- mean(p8, na.rm=TRUE) 
+          r2[counter] <- mean(p7, na.rm=TRUE); pv[counter] <- mean(p8, na.rm=TRUE)
         }else{
           mix <- lm(as.formula(fix), data=mydataSub)
           sm <- summary(mix)
@@ -108,7 +104,7 @@ rgg <- function(
           r2[counter] <- sm$r.squared
           pv[counter] <- 1 - pf(sm$fstatistic[1], df1=sm$fstatistic[2], df2=sm$fstatistic[3])
         }
-      
+
         # mix <- asreml(as.formula(fix),
         #                     random= as.formula(ranran),
         #                     # group=prov$glist,
@@ -125,8 +121,8 @@ rgg <- function(
         # seb1[counter] <- mix$vcoeff$fixed[1]
         # seb0[counter] <- mix$vcoeff$fixed[2]
         ## gg
-        
-        
+
+
         # read the original met and find out how many envs were behind
         dtwf <- mydata2[which(mydata2$trait %in% iTrait),] # data with fields
         dtwfs <- as.matrix(with(dtwf,table(fieldinst,genoYearOrigin)))
@@ -152,7 +148,7 @@ rgg <- function(
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
     geno = NA,  rep	= NA,  block =	NA,
-    rowcoord =	NA,  colcoord = NA, 
+    rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(mydataSub$stage)),collapse=", ")
   )
   saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
@@ -170,21 +166,21 @@ rgg <- function(
     h2Threshold = NA
   )
   saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-  
+
   # write predictions
- 
+
   # write pipeline metrics
   pm <- data.frame(value=c(gg,inter,ggp, gg.y1,r2,pv, ntrial),
-                   stdError=c(seb1,seb0,segp,gg.yn,rep(NA,length(r2)),rep(NA,length(pv)), ntrial.se), 
+                   stdError=c(seb1,seb0,segp,gg.yn,rep(NA,length(r2)),rep(NA,length(pv)), ntrial.se),
                    fieldinst=c(field,field,field,field,field,field, field),
                    trait=c(trt,trt,trt,trt,trt,trt,trt),
                    analysisId=id, method= ifelse(deregress,"blup+dereg","mackay"),traitUnits=NA,
                    stage = paste(sort(unique(mydataSub$stage)),collapse=", "),
-                   parameter= c(rep("ggSlope",length(gg)), rep("ggInter",length(inter)), rep("gg%",length(gg)), rep("ggYear",length(gg.y1)), rep("r2",length(r2)), rep("pVal",length(pv)), rep("nTrialPerYear", length(ntrial)) ), 
+                   parameter= c(rep("ggSlope",length(gg)), rep("ggInter",length(inter)), rep("gg%",length(gg)), rep("ggYear",length(gg.y1)), rep("r2",length(r2)), rep("pVal",length(pv)), rep("nTrialPerYear", length(ntrial)) ),
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", ")
                    )
   saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-  
+
   if(verbose){
   cat(paste("Your analysis id is:",id,"\n"))
   cat(paste("Your results will be available in the pipeline_metrics database under such id \n"))

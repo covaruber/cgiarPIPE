@@ -6,19 +6,16 @@ sta <- function(
     pworkspace="360mb",
     wd=NULL, verbose=FALSE
 ){
-  
+
   if(is.null(wd)){wd <- getwd()}
   md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-  
+
   id <- paste("sta",idGenerator(5,5),sep="")
-  type <- "sta" 
+  type <- "sta"
   if(is.null(phenoDTfile)){stop("Please provide the name of the file to be used for analysis", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-  library(cgiarBase) # biometrics for cgiar
-  library(cgiarFTDA)
-  library(asreml)
-  
+
   ###################################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
@@ -28,7 +25,7 @@ sta <- function(
   # modeling <- read.csv(file.path(wd,"modeling.csv"))
   # predictions <- read.csv(file.path(wd,"predictions.csv"))
   # pipeline_metrics <- read.csv(file.path(wd,"pipeline_metrics.csv"))
-  
+
   traitToRemove <- character()
   for(k in 1:length(trait)){
     if (!trait[k] %in% colnames(mydata)){
@@ -47,7 +44,7 @@ sta <- function(
   predictionsList <- list(); counter=1
   for(iTrait in trait){ # iTrait=trait[1]
     if(verbose){cat(paste("Analyzing trait", iTrait,"\n"))}
-    for(iField in fields){ # iField = fields[1]# "2019_WS_BINA_Regional_Station_Barishal" 
+    for(iField in fields){ # iField = fields[1]# "2019_WS_BINA_Regional_Station_Barishal"
       if(verbose){cat(paste("Analyzing field", iField,"\n"))}
       # subset data
       mydataSub <- droplevels(mydata[which(as.character(mydata$fieldinstF) %in% iField),])
@@ -55,7 +52,7 @@ sta <- function(
       # remove outliers
       cleaningSub <- cleaning[which(cleaning$traitName %in% iTrait),]
       out <- which(mydataSub$rowindex %in% cleaningSub$indexRow )
-      
+
       if(length(out) > 0){mydataSub[out,"trait"] <- NA}
       # do analysis
       if(!is.na(var(mydataSub[,"trait"],na.rm=TRUE))){ # if there's variance
@@ -81,19 +78,19 @@ sta <- function(
                                random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
                                rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
                                dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
-                               
+
                                minRandomLevels=list(rowcoordF= 3, colcoordF=3, trialF=2,repF=2, blockF=4),
                                minResidualLevels=list(rowcoordF=5, colcoordF=5),
-                               
+
                                exchangeRandomEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                               
+
                                exchangeResidualEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                               
-                               customRandomLevels=NULL, customResidualLevels=NULL, 
-                               
+
+                               customRandomLevels=NULL, customResidualLevels=NULL,
+
                                xCoordinate= "rowcoordF",yCoordinate ="colcoordF",
                                doubleConstraintRandom=c("rowcoordF","colcoordF"), verbose=verbose)
-          
+
           # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
           if((length(mde$used$fieldinstF$rowcoordF) == 0) & (length(mde$used$fieldinstF$colcoordF) == 0)){
             newdat <- mydataSub
@@ -101,7 +98,7 @@ sta <- function(
             funny <- NULL
           }else{
             Z <- spl2Db(x.coord=mydataSub$rowcoord,y.coord=mydataSub$colcoord, at.var=NULL,at.levels=NULL, nsegments = c(10,10),
-                        degree = c(3,3), penaltyord = c(2,2),nestorder = c(1,1), 
+                        degree = c(3,3), penaltyord = c(2,2),nestorder = c(1,1),
                         minbound=NULL, maxbound=NULL, method="Lee", what="base")
             newdat <- cbind(mydataSub,Z)
             glist <<- list(field=1:ncol(Z) + ncol(mydataSub)); #names(glist) <- "field"
@@ -109,7 +106,7 @@ sta <- function(
           }
           fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
           ranran0 <-"~genoF" # simple formula, can be more complex
-          
+
           ranran <- paste(c(ranran0, mde$random, funny), collapse=" + ")
           ranres <- "~dsum(~units | fieldinstF)"
           mixRandom <- try(
@@ -122,11 +119,11 @@ sta <- function(
                    data=newdat, maxiter=50),
             silent = TRUE
           );  # mixRandom <- update(mixRandom, maxiter=5)
-          
-          
+
+
           # only keep variance components that were greater than zero
           if(!inherits(mixRandom,"try-error") ){ # if random model runs well try the fixed model
-            sm <- summary(mixRandom)$varcomp; 
+            sm <- summary(mixRandom)$varcomp;
             fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
             newRanran <- setdiff(rownames(sm)[which(sm[,1] >0.05)],c("fieldinstF!R","genoF"))
             newRanran <- gsub("):","' ):",gsub(", ",", '", newRanran))
@@ -149,7 +146,7 @@ sta <- function(
               silent = TRUE
             )
             if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
-              
+
               pp <- predict(mixFixed, classify = "genoF", pworkspace=pworkspace,data=newdat, trace=FALSE, maxit=1)$pvals#, aliased=TRUE)
               colnames(pp) <- replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
               pp$trait <- iTrait
@@ -158,17 +155,17 @@ sta <- function(
               if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
               pp$genoYearTesting <- unique(newdat$year)[1]
               # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
-              ## heritabilities   
+              ## heritabilities
               vr <- paste0("V",grep("fieldinstF!R",rownames(summary(mixRandom)$varcomp)))
               vg <- paste0("V",grep("genoF",rownames(summary(mixRandom)$varcomp)))
               h2Pred <- vpredict(mixRandom,  as.formula(paste0("~(",vg,")/(",vg,"+",vr,")")) )
               ## reliability
               pp$rel <- 1 - (pp$stdError^2)/(2*summary(mixRandom)$varcomp[as.numeric(gsub("V","",vg)),"component"])
-              predictionsList[[counter]] <- pp; 
+              predictionsList[[counter]] <- pp;
               h2[counter] <- h2Pred$Estimate[1]; se[counter] <- h2Pred$SE[1] # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
               field[counter] <- iField; trt[counter] <- iTrait
               counter=counter+1
-              
+
             } # end of if fixed model run well
           }else{ # if there was singularities we just take means and assigna h2 of zero
             if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
@@ -183,12 +180,12 @@ sta <- function(
             if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
             pp$genoYearTesting <- unique(newdat$year)[1]
             # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
-            predictionsList[[counter]] <- pp; 
+            predictionsList[[counter]] <- pp;
             h2[counter] <- 0; se[counter] <- 0 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
             field[counter] <- iField; trt[counter] <- iTrait
             counter=counter+1
           } # end of is mixed model run well
-          
+
         }
       }
     }
@@ -225,7 +222,7 @@ sta <- function(
     analysisId	= id,analysisType =	type,fieldbooks	= NA,
     phenoDataFile =	phenoDTfile, markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,country	= NA,  trial	= NA,  design =	NA,
-    geno = NA,  rep	= NA,  block =	NA,rowcoord =	NA,  colcoord = NA,  
+    geno = NA,  rep	= NA,  block =	NA,rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
@@ -236,21 +233,21 @@ sta <- function(
     randomModel = setdiff(as.character(ranran),"~"),residualModel = ranres,h2Threshold = NA
   )
   saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-  
+
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-  
+
   # write pipeline metrics
   pm <- data.frame(value=h2,stdError=se, fieldinst=field,trait=trt,
                    analysisId=id, method="ratio",traitUnits=NA,
-                   parameter="H2", 
+                   parameter="H2",
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", "),
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-  
+
   if(verbose){
   cat(paste("Your analysis id is:",id,"\n"))
   cat(paste("Your results will be available in the predictions database under such id \n"))

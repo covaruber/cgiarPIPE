@@ -1,44 +1,41 @@
 index <- function(
     phenoDTfile= NULL, # analysis to be picked from predictions database
-    trait= NULL, 
+    trait= NULL,
     desirev = NULL,
     scaled=TRUE,
     wd=NULL,
     verbose=TRUE
 ){
-  
+
   if(is.null(wd)){wd <- getwd()}
   md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-  
+
   id <- paste("idx",idGenerator(5,5),sep="")
-  type <- "idx" 
+  type <- "idx"
   if(is.null(phenoDTfile)){stop("Please provide the name of the analysis to locate the predictions", call. = FALSE)}
   if(length(grep("met",phenoDTfile)) == 0){stop("Index can only be calculated on results from a MET analysis using across environment predictions",call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
   if(length(trait) != length(desirev)){stop("The number of traits and desirev values needs to be equal",call. = FALSE)}
-  library(cgiarBase) # biometrics for cgiar
-  library(cgiarFTDA)
-  # library(asreml)
-  
+
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
   mydata <- mydata[which(mydata$trait %in% trait),]
-  
+
   ############################
   ## index calculation
-  
+
   wide0 <- reshape(mydata[,c("geno","trait","predictedValue")], direction = "wide", idvar = "geno",
                    timevar = "trait", v.names = "predictedValue", sep= "_")
   wide <- as.matrix(wide0[,-1]); colnames(wide) <- gsub("predictedValue_","", colnames(wide0)[-1])#unique(mydata$trait)
   wide <- as.matrix(wide[,trait]); colnames(wide) <- trait # ensure order of the user so weights also match
   wide <- apply(wide,2,sommer::imputev)
-  
+
   if(scaled){
     if(verbose){
-      cat(paste("scaled has been set to",scaled,"'desirev' values are expected to be the desired change in std. deviations \n")) 
+      cat(paste("scaled has been set to",scaled,"'desirev' values are expected to be the desired change in std. deviations \n"))
     }
     wide <- apply(wide,2,scale)
     wide[which(is.na(wide), arr.ind = TRUE)] <- 0
@@ -50,8 +47,8 @@ index <- function(
   G <- cov(wide, use="pairwise.complete.obs")
   G[which(is.na(G), arr.ind = TRUE)] <- 0
   b <- MASS::ginv(G)%*%desirev # desired weights Ginv*d, equivalent to knowing w (economic weights)
-  merit <- wide %*% b 
-  
+  merit <- wide %*% b
+
   #########################################
   ## update databases
   newped <- data.frame(analysisId=id,pipeline=unique(mydata$pipeline)[1], trait="index",
@@ -80,12 +77,12 @@ index <- function(
   })
   baseOrigin <- data.frame(geno=entries,genoYearOrigin=vals, genoYearTesting=vals4, stage=vals2, genoCode=vals3)
   predictionsBind <- merge(newped,baseOrigin, by="geno", all.x=TRUE)
-  
+
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-  
+
   ## write the parameters to the parameter database
   db.params <- data.frame(
     analysisId	= id,
@@ -96,7 +93,7 @@ index <- function(
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
     geno = NA,  rep	= NA,  block =	NA,
-    rowcoord =	NA,  colcoord = NA, 
+    rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(mydata$stage)),collapse=", ")
   )
   saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
@@ -114,10 +111,10 @@ index <- function(
     h2Threshold = NA
   )
   saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-  
+
   # write pipeline metrics
   pm <- data.frame(value=c(b[,1],desirev),
-                   stdError=NA, 
+                   stdError=NA,
                    fieldinst="across",
                    trait=c( colnames(wide), colnames(wide)),
                    analysisId=id, method= ifelse(scaled,"desireScaled","desireOriginal"),
@@ -127,7 +124,7 @@ index <- function(
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", ")
   )
   saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-  
+
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     cat(paste("Your results will be available in the predictions database under such id \n"))
