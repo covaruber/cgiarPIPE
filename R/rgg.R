@@ -8,9 +8,9 @@ rgg <- function(
     wd=NULL, verbose=TRUE
 ){
 
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("rgg",idGenerator(5,5),sep="")
   type <- "rgg"
@@ -20,12 +20,12 @@ rgg <- function(
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
-  parameters <- readRDS(file.path(wd,"metadata",paste0(phenoDTfile)))
-  mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
+  parameters <- phenoDTfile$metadata # readRDS(file.path(wd,"metadata",paste0(phenoDTfile)))
+  mydata <- phenoDTfile$predictions #readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
 
-  current.anid <- unique(mydata$analysisId)
-  past.anid <- parameters[which(parameters$analysisId %in% current.anid),"phenoDataFile"]
-  mydata2 <- readRDS(file.path(wd,"predictions",paste0(past.anid)))
+  # current.anid <- unique(mydata$analysisId)
+  # past.anid <- parameters[which(parameters$analysisId %in% current.anid),"phenoDataFile"]
+  # mydata2 <- readRDS(file.path(wd,"predictions",paste0(past.anid)))
 
   if(length(unique(mydata$genoYearOrigin)) == 1){stop("Only one year of data. Realized genetic gain analysis cannot proceed.", call. = FALSE)}
   ############################
@@ -123,11 +123,11 @@ rgg <- function(
         ## gg
 
 
-        # read the original met and find out how many envs were behind
-        dtwf <- mydata2[which(mydata2$trait %in% iTrait),] # data with fields
-        dtwfs <- as.matrix(with(dtwf,table(fieldinst,genoYearOrigin)))
-        ntrial[counter] <- mean(apply(dtwfs/dtwfs,2,sum, na.rm=TRUE))
-        ntrial.se[counter] <- sd(apply(dtwfs/dtwfs,2,sum, na.rm=TRUE))
+        # read the original input-met data and find out how many envs were behind
+        # dtwf <- mydata2[which(mydata2$trait %in% iTrait),] # data with fields
+        # dtwfs <- as.matrix(with(dtwf,table(fieldinst,genoYearOrigin)))
+        ntrial[counter] <- NA#mean(apply(dtwfs/dtwfs,2,sum, na.rm=TRUE))
+        ntrial.se[counter] <- NA#sd(apply(dtwfs/dtwfs,2,sum, na.rm=TRUE))
         #
         field[counter] <- "across"; trt[counter] <- iTrait
         gg.y1[counter] <- sort(unique(mydataSub$genoYearOrigin), decreasing = FALSE)[1]
@@ -143,7 +143,7 @@ rgg <- function(
     analysisId	= id,
     analysisType =	type,
     fieldbooks	= NA,
-    phenoDataFile =	phenoDTfile,
+    phenoDataFile =	NA,
     markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
@@ -151,7 +151,7 @@ rgg <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(mydataSub$stage)),collapse=", ")
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait,
@@ -165,7 +165,7 @@ rgg <- function(
     residualModel = ranres,
     h2Threshold = NA
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
 
   # write predictions
 
@@ -179,11 +179,13 @@ rgg <- function(
                    parameter= c(rep("ggSlope",length(gg)), rep("ggInter",length(inter)), rep("gg%",length(gg)), rep("ggYear",length(gg.y1)), rep("r2",length(r2)), rep("pVal",length(pv)), rep("nTrialPerYear", length(ntrial)) ),
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", ")
                    )
-  saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
+  # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
 
   if(verbose){
   cat(paste("Your analysis id is:",id,"\n"))
-  cat(paste("Your results will be available in the pipeline_metrics database under such id \n"))
+  # cat(paste("Your results will be available in the pipeline_metrics database under such id \n"))
   }
-  return(paste("rgg done:",id))
+  result <- list(metrics=pm, predictions=NA, modeling=mod, metadata=db.params,
+                 cleaned=NA, outliers=NA, desire=NA, id=id)
+  return(result)#paste("rgg done:",id))
 }

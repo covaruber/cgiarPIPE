@@ -3,13 +3,13 @@ index <- function(
     trait= NULL,
     desirev = NULL,
     scaled=TRUE,
-    wd=NULL,
+    # wd=NULL,
     verbose=TRUE
 ){
 
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("idx",idGenerator(5,5),sep="")
   type <- "idx"
@@ -21,7 +21,7 @@ index <- function(
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
-  mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
+  mydata <- phenoDTfile$predictions # readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
   mydata <- mydata[which(mydata$trait %in% trait),]
 
   ############################
@@ -81,14 +81,14 @@ index <- function(
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
+  # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
 
   ## write the parameters to the parameter database
   db.params <- data.frame(
     analysisId	= id,
     analysisType =	type,
     fieldbooks	= NA,
-    phenoDataFile =	phenoDTfile,
+    phenoDataFile =	NA,
     markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
@@ -96,7 +96,7 @@ index <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(mydata$stage)),collapse=", ")
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = colnames(wide),
@@ -110,7 +110,7 @@ index <- function(
     residualModel = NA,
     h2Threshold = NA
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
 
   # write pipeline metrics
   pm <- data.frame(value=c(b[,1],desirev),
@@ -123,11 +123,13 @@ index <- function(
                    parameter= c(rep("weight",length(colnames(wide))),rep("desire", length(colnames(wide)))),
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", ")
   )
-  saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
+  # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
 
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
-    cat(paste("Your results will be available in the predictions database under such id \n"))
+    # cat(paste("Your results will be available in the predictions database under such id \n"))
   }
-  return(paste("index done:",id))
+  result <- list(metrics=pm, predictions=predictionsBind[,predcols], modeling=mod, metadata=db.params,
+                 cleaned=NA, outliers=NA, desire=NA, id=id)
+  return(result)#paste("index done:",id))
 }

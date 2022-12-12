@@ -9,13 +9,14 @@ ocs <- function(
     wd=NULL
 ){
 
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("ocs",idGenerator(5,5),sep="")
   type <- "ocs"
-  if(is.null(phenoDTfile)){stop("Please provide the name of the analysis to locate the predictions", call. = FALSE)}
+  if(is.null(phenoDTfile)){stop("Please provide the predictions", call. = FALSE)}
+  if(is.null(relDTfile)){stop("Please provide the markers", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
   if(length(trait) > 1){
     stop(paste0(" Only one trait can be used for optimal contribution. We suggest using an index"), call. = FALSE)
@@ -23,11 +24,11 @@ ocs <- function(
 
   ############################
   # loading the dataset
-  mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
+  mydata <- phenoDTfile$predictions # readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
 
-  ava.files <- dir(file.path(wd,"files_cleaned"))
-  if(!paste0(relDTfile) %in% ava.files){stop("relDTfile is not present in the files_cleaned folder. Please check the name of your file and its location",call. = FALSE)}
-  myrel <- readRDS(file.path(wd,"files_cleaned",paste0(relDTfile)))
+  # ava.files <- dir(file.path(wd,"files_cleaned"))
+  # if(!paste0(relDTfile) %in% ava.files){stop("relDTfile is not present in the files_cleaned folder. Please check the name of your file and its location",call. = FALSE)}
+  myrel <- relDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(relDTfile)))
 
   utraits <- unique(mydata$trait)
   if (!trait %in% utraits){
@@ -84,7 +85,7 @@ ocs <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait,
@@ -98,17 +99,19 @@ ocs <- function(
     residualModel = NA,
     h2Threshold = NA
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
 
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
+  # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
 
   # write pipeline metrics
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     cat(paste("Your results will be available in the predictions database under such id \n"))
   }
-  return(paste("ocs done:",id))
+  result <- list(metrics=NA, predictions=predictionsBind[,predcols], modeling=mod, metadata=db.params,
+                 cleaned=NA, outliers=NA, desire=NA, id=id)
+  return(result)#paste("ocs done:",id))
 }

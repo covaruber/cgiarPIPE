@@ -10,13 +10,13 @@ met <- function(
     heritUB= 0.95,
     workspace="900mb",
     pworkspace="900mb",
-    scaledDesire=TRUE,
-    wd=NULL, verbose=TRUE
+    scaledDesire=TRUE,# wd=NULL, 
+    verbose=TRUE
 ){
 
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("met",idGenerator(5,5),sep="")
   type <- "met"
@@ -26,8 +26,8 @@ met <- function(
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
-  mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
-  pipeline_metrics <- readRDS(file.path(wd,"metrics",paste0(phenoDTfile)))
+  mydata <- phenoDTfile$predictions #readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
+  pipeline_metrics <- phenoDTfile$metrics #readRDS(file.path(wd,"metrics",paste0(phenoDTfile)))
 
   utraits <- unique(mydata$trait)
   traitToRemove <- character()
@@ -147,7 +147,7 @@ met <- function(
         }else{
           if(verbose){ cat(paste("Aggregating and assuming h2 = 0 \n"))}
           pp <- aggregate(predictedValue ~ genoF, FUN=mean, data=mydataSub)
-          pp$stdError <- 0
+          pp$stdError <- 1
           pp$status <- "Aggregated"
           pp$rel <- 0
           ## heritabilities # h2Pred <- abs(round(mean(1 - (pp$stdError^2 / sum(summary(mix)$varcomp[1:2,1]))), 3))
@@ -225,7 +225,7 @@ met <- function(
     analysisId	= id,
     analysisType =	type,
     fieldbooks	= NA,
-    phenoDataFile =	phenoDTfile,
+    phenoDataFile =	NA,
     markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
@@ -233,7 +233,7 @@ met <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait,
@@ -247,12 +247,12 @@ met <- function(
     residualModel = ranres,
     h2Threshold = paste(c(heritLB,heritUB),collapse=" , ")
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
 
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
+  # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
 
   # write pipeline metrics
   pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(NA,length(mu))),
@@ -262,16 +262,18 @@ met <- function(
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", "),
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
-  saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
+  # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
   # save desire file
-  desire(trait=trait,h2=h2, G=G,
-         pathFile=file.path(wd,"desire",paste0("desire_",id,".txt"))
+  des <- desire(trait=trait,h2=h2, G=G
+         # pathFile=file.path(wd,"desire",paste0("desire_",id,".txt"))
   )
   ##
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
-    cat(paste("Your results will be available in the predictions database under such id \n"))
-    cat(paste("Your desire file will be available in the desire folder under such id \n"))
+    # cat(paste("Your results will be available in the predictions database under such id \n"))
+    # cat(paste("Your desire file will be available in the desire folder under such id \n"))
   }
-  return(paste("met done:",id))
+  result <- list(metrics=pm, predictions=predictionsBind[,predcols], modeling=mod, metadata=db.params,
+                 cleaned=NA, outliers=NA, desire=des, id=id)
+  return(result)#paste("met done:",id))
 }

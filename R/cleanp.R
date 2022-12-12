@@ -10,12 +10,13 @@ cleanp <- function(
   trait= NULL, fieldinst= c("year", "season", "location"),
   # outlier cleaning parameters
   outlierCoef= 1.5,
-  traitLB = 0.01, traitUB= Inf, wd=NULL, verbose=FALSE
+  traitLB = 0.01, traitUB= Inf,# wd=NULL, 
+  verbose=FALSE
 ){
   #
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be cleaned", call. = FALSE)}
   # traitClasses <- unlist(lapply(xx,class))
   outlierCoef <- rep(outlierCoef,100); outlierCoef <- outlierCoef[1:length(trait)]
@@ -28,7 +29,7 @@ cleanp <- function(
   ###################################
   ## shape the data
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
-  mydata <- read.csv(file.path(wd,"files_raw",phenoDTfile))
+  mydata <- phenoDTfile # read.csv(file.path(wd,"files_raw",phenoDTfile))
   # cleaning <- read.csv(file.path(wd,"cleaning.csv"))
   # parameters <- read.csv(file.path(wd,"parameters.csv"))
   # modeling <- read.csv(file.path(wd,"modeling.csv"))
@@ -115,24 +116,24 @@ cleanp <- function(
       }# end for each trial
     } # end for each trait
     outBind <- do.call(rbind, outList)
-    outBind$analysisId <- id
-    # cleaning <- unique(rbind(cleaning, outBind[,colnames(cleaning)]))
+    # print(str(outBind))
+    if(!is.null(outBind)){outBind$analysisId <- id}
   }
   ####################################################
   ## update database
-  saveRDS(mydata_cleaned, file = file.path(wd,"files_cleaned",paste0(id,".rds")))
+  # saveRDS(mydata_cleaned, file = file.path(wd,"files_cleaned",paste0(id,".rds")))
   ## write the outliers to the cleaning database
-  if(!is.null(trait)){saveRDS(outBind, file = file.path(wd,"outliers",paste0(id,".rds")))}
+  # if(!is.null(trait)){saveRDS(outBind, file = file.path(wd,"outliers",paste0(id,".rds")))}
   ## write the parameters to the parameter database
   db.params <- data.frame(
     analysisId	= id, analysisType =	type, fieldbooks	= NA,
-    phenoDataFile =	phenoDTfile,markerbooks	= NA,
+    phenoDataFile =	NA,markerbooks	= NA,
     markerDataFile =	NA,year = year,season =	season,
     location =	location,country	= country,trial	= trial,
     design =	design,geno = geno,rep	= rep,block =	block,
     rowcoord =	rowcoord,colcoord = colcoord,stage = stage
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   # parameters <- unique(rbind(parameters, db.params[,colnames(parameters)]))
   # write.csv(parameters, file = file.path(wd,"parameters.csv"),row.names = FALSE)
   ## write the values used for cleaning to the modeling database
@@ -142,13 +143,15 @@ cleanp <- function(
     analysisType = type, fixedModel = NA,randomModel = NA,
     residualModel = NA,h2Threshold = NA
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
   # modeling <- unique(rbind(modeling, mod[,colnames(modeling)]))
   # write.csv(modeling, file = file.path(wd,"modeling.csv"),row.names = FALSE)
 
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
-    cat(paste("Your results will be available in the 'files_cleaned' folder under such id \n"))
+    # cat(paste("Your results will be available in the 'files_cleaned' folder under such id \n"))
   }
-  return(paste("cleaning done:",id))
+  result <- list(metrics=NA, predictions=NA, modeling=mod, metadata=db.params,
+                 cleaned=mydata_cleaned, outliers=outBind, desire=NA, id=id)
+  return(result)#paste("cleaning done:",id))
 }

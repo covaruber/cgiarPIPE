@@ -1,10 +1,10 @@
 
-desire <- function(trait,h2, G, pathFile){
+desire <- function(trait,h2, G){ # pathFile
   
   if(missing(trait)){stop("trait missing.", call. = FALSE)}
   if(missing(h2)){stop("h2 missing.", call. = FALSE)}
   if(missing(G)){stop("G missing.", call. = FALSE)}
-  if(missing(pathFile)){stop("pathFile missing.", call. = FALSE)}
+  # if(missing(pathFile)){stop("pathFile missing.", call. = FALSE)}
   s1 <- data.frame("  Input file for program Desire."); colnames(s1)<-"m"
   s2 <- data.frame("  Number of traits ...  "); colnames(s2)<-"m"
   s3 <- data.frame(length(trait)); colnames(s3) <- "m"
@@ -24,9 +24,9 @@ desire <- function(trait,h2, G, pathFile){
   colnames(s.1.12plus) <- colnames(s13)
   desireResult <- rbind(s.1.12plus,s13)
   
-  
-  write.table(desireResult,
-              file=pathFile,
-              sep = "\t",
-              row.names = FALSE, quote = FALSE, col.names = FALSE)
+  return(desireResult)
+  # write.table(desireResult,
+  #             file=pathFile,
+  #             sep = "\t",
+  #             row.names = FALSE, quote = FALSE, col.names = FALSE)
 }

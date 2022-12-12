@@ -1,11 +1,12 @@
 cleanm <- function(
     markerDTfile= NULL, geno="geno", useColumns=NULL,
-    missingData=c("NN",""),
-    wd=NULL
+    verbose=FALSE,
+    missingData=c("NN","")
+    # wd=NULL
 ){
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("clm",idGenerator(5,5),sep="")
   type <- "cleaningm"
@@ -15,9 +16,9 @@ cleanm <- function(
   # loading the dataset
   if (is.null(markerDTfile)) stop("No input marker data file specified.")
   # modeling <- read.csv("modeling.csv")
-  ava.files <- dir(file.path(wd,"files_raw"))
-  if(!markerDTfile %in% ava.files){stop("markerDTfile is not present in the files_raw folder. Please check the name of your file and its location",call. = FALSE)}
-  mydata <- read.csv(file.path(wd,"files_raw",markerDTfile))
+  # ava.files <- dir(file.path(wd,"files_raw"))
+  # if(!markerDTfile %in% ava.files){stop("markerDTfile is not present in the files_raw folder. Please check the name of your file and its location",call. = FALSE)}
+  mydata <- markerDTfile # read.csv(file.path(wd,"files_raw",markerDTfile))
 
   if(!geno %in% colnames(mydata) ){
     stop("Please make sure that a column 'geno' with genotype names is included in the file and the rest of the columns is only markers",call. = FALSE)
@@ -68,14 +69,18 @@ cleanm <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = NA
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   # write the values used for cleaning to the modeling database
   # write predictions
   # write pipeline metrics
 
-  saveRDS(M0, file = file.path(wd,"files_cleaned",paste0(id,".rds")))
-
-  cat(paste("Your analysis id is:",id,"\n"))
-  cat(paste("Your results will be available in the files_cleaned folder under such id \n"))
-  return("cleanm done")
+  # saveRDS(M0, file = file.path(wd,"files_cleaned",paste0(id,".rds")))
+  if(verbose){
+    cat(paste("Your analysis id is:",id,"\n"))
+    cat(paste("Your results will be available in the files_cleaned folder under such id \n"))
+  }
+  result <- list(metrics=NA, predictions=NA, modeling=NA, metadata=db.params,
+                 cleaned=M0, outliers=NA, desire=NA, id=id)
+  return(result)#
+  # return("cleanm done")
 }

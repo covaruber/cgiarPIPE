@@ -4,13 +4,13 @@ pgg <- function(
     fieldinst=NULL,
     year=NULL,
     percentage=10,
-    lIdeal=NA,
-    wd=NULL, verbose=TRUE
+    lIdeal=NA,# wd=NULL, 
+    verbose=TRUE
 ){
 
-  if(is.null(wd)){wd <- getwd()}
-  md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
+  # if(is.null(wd)){wd <- getwd()}
+  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
+  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("pgg",idGenerator(5,5),sep="")
   type <- "pgg"
@@ -20,7 +20,7 @@ pgg <- function(
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
-  mydata <- readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
+  mydata <- phenoDTfile$predictions #readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
 
   ############################
   ## gg analysis
@@ -56,7 +56,7 @@ pgg <- function(
     analysisId	= id,
     analysisType =	type,
     fieldbooks	= NA,
-    phenoDataFile =	phenoDTfile,
+    phenoDataFile =	NA,
     markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
@@ -64,7 +64,7 @@ pgg <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(mydataSub$stage)),collapse=", ")
   )
-  saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
+  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait,
@@ -78,7 +78,7 @@ pgg <- function(
     residualModel = NA,
     h2Threshold = NA
   )
-  saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
+  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
 
   # write predictions
 
@@ -92,10 +92,12 @@ pgg <- function(
                    parameter= c(rep("i",length(r)), rep("r",length(r)), rep("sigma",length(r)), rep("La",length(r)), rep("Li",length(r)), rep("R",length(r)), rep("gga", length(r)), rep("ggi", length(r)) ),
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", ")
   )
-  saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
+  # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     cat(paste("Your results will be available in the pipeline_metrics database under such id \n"))
   }
-  return(paste("pgg done:",id))
+  result <- list(metrics=pm, predictions=NA, modeling=mod, metadata=db.params,
+                 cleaned=NA, outliers=NA, desire=NA, id=id)
+  return(result)#paste("pgg done:",id))
 }
