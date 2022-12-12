@@ -65,9 +65,9 @@ ocs <- function(
   crossPlan
 
   predictionsBind <- data.frame(analysisId=id, pipeline= paste(sort(unique(mydata$pipeline)),collapse=", "),
-                                trait=trait, genoCode=NA, geno=paste(crossPlan[,1],crossPlan[,2], sep=" x "),
-                                genoType="predictedCross", genoYearOrigin=NA, genoYearTesting=NA,
-                                fieldinst=fieldinst, predictedValue=crossPlan[,3], stdError=NA, rel=NA, stage=NA
+                                trait=trait, genoCode=1:nrow(crossPlan), geno=paste(crossPlan[,1],crossPlan[,2], sep=" x "),
+                                genoType="predictedCross", genoYearOrigin=1, genoYearTesting=1,
+                                fieldinst=fieldinst, predictedValue=crossPlan[,3], stdError=1e-6, rel=1e-6, stage="unknown"
                                 )
 
   #########################################

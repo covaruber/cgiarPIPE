@@ -34,8 +34,8 @@ pgg <- function(
     mydataSub <- droplevels(mydata[which((mydata$trait == iTrait) & (mydata$fieldinst %in% fieldinst) & (mydata$genoYearTesting == year) ),])
     # calculate parameters
     rels <- mydataSub$rel;
-    badrels <- which(rels < 0); if(length(badrels) > 0){ rels[badrels] <- NA}
-    r[iTrait] <- ifelse(length(na.omit(rels)) > 0, mean(sqrt(na.omit(rels)), na.rm=TRUE), 0)
+    badrels <- which(rels < 0); if(length(badrels) > 0){ rels[badrels] <- 1e-6}
+    r[iTrait] <- ifelse(length(na.omit(rels)) > 0, mean(sqrt(na.omit(rels)), na.rm=TRUE), 1e-6)
 
     sigma[iTrait] <- sd(mydataSub$predictedValue, na.rm = TRUE)
 
@@ -84,7 +84,7 @@ pgg <- function(
 
   # write pipeline metrics
   pm <- data.frame(value=c(rep(i,length(trait)),r,sigma, age, lIdeal, R, ggAge, ggIdeal),
-                   stdError=NA,
+                   stdError=1e-6,
                    fieldinst=fieldinst,
                    trait=rep(trait,8), analysisId=id,
                    method= c(rep("qnorm",length(r)), rep("reliability",length(r)), rep("sd",length(r)), rep("age",length(r)), rep("ideal",length(r)), rep("product",length(r)), rep("age", length(r)), rep("ideal", length(r)) ),

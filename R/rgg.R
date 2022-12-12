@@ -171,7 +171,7 @@ rgg <- function(
 
   # write pipeline metrics
   pm <- data.frame(value=c(gg,inter,ggp, gg.y1,r2,pv, ntrial),
-                   stdError=c(seb1,seb0,segp,gg.yn,rep(NA,length(r2)),rep(NA,length(pv)), ntrial.se),
+                   stdError=c(seb1,seb0,segp,gg.yn,rep(1e-6,length(r2)),rep(1e-6,length(pv)), ntrial.se),
                    fieldinst=c(field,field,field,field,field,field, field),
                    trait=c(trt,trt,trt,trt,trt,trt,trt),
                    analysisId=id, method= ifelse(deregress,"blup+dereg","mackay"),traitUnits=NA,

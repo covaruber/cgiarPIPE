@@ -137,11 +137,11 @@ met <- function(
         if(!inherits(mix,"try-error") ){ # if random model runs well try the fixed model
           pp0 <- predict(mix, classify = "genoF", pworkspace=pworkspace, aliased=TRUE, trace=verbose, maxit=1)#, aliased=TRUE)
           pp <- pp0$pvals
-          colnames(pp) <- replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
+          colnames(pp) <- cgiarBase::replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
           pp$rel <- 1 - (pp$stdError^2 / (2*sum(summary(mix)$varcomp[1:2,1])))
           ## heritabilities
           h2Pred <- 1 - pp0$avsed/(2*sum(summary(mix)$varcomp[1:2,1]))
-          h2[counter] <- h2Pred; h2.se[counter] <- NA
+          h2[counter] <- h2Pred; h2.se[counter] <- 1e-6
           ## genetic variances
           vg[counter] <- sum(summary(mix)$varcomp[1:2,1]); vg.se[counter] <- sum(summary(mix)$varcomp[1:2,2])
         }else{
@@ -149,11 +149,11 @@ met <- function(
           pp <- aggregate(predictedValue ~ genoF, FUN=mean, data=mydataSub)
           pp$stdError <- 1
           pp$status <- "Aggregated"
-          pp$rel <- 0
+          pp$rel <- 1e-6
           ## heritabilities # h2Pred <- abs(round(mean(1 - (pp$stdError^2 / sum(summary(mix)$varcomp[1:2,1]))), 3))
-          h2[counter] <- 0; h2.se[counter] <- NA
+          h2[counter] <- 1e-6; h2.se[counter] <- 1e-6
           ## genetic variances
-          vg[counter] <- 0; vg.se[counter] <- 0
+          vg[counter] <- 1e-6; vg.se[counter] <- 1e-6
         }
         pp$trait <- iTrait
         pp$fieldinstF <- "across"
@@ -169,7 +169,7 @@ met <- function(
         your.year <- as.numeric(substr(year.mo.day[1],3,4))
         crossYears2 <- as.numeric(paste0(ifelse(crossYears < your.year, "20","19"), as.character(crossYears)))
         cl[counter] <- abs(mean(mydataSub$genoYearOrigin, na.rm=TRUE) - mean(crossYears2, na.rm=TRUE))
-        cl.se[counter] <- NA
+        cl.se[counter] <- 1e-6
         ## mean
         mu[counter] <- mean(pp$predictedValue, na.rm=TRUE)
         ## others
@@ -182,7 +182,7 @@ met <- function(
   predictionsBind <- do.call(rbind, predictionsList)
   predictionsBind$analysisId <- id
   predictionsBind$id.geno <- NA
-  colnames(predictionsBind) <- replaceValues(Source=colnames(predictionsBind), Search=c("genoF","fieldinstF","entryType"), Replace=c("geno","fieldinst","genoType"))
+  colnames(predictionsBind) <- cgiarBase::replaceValues(Source=colnames(predictionsBind), Search=c("genoF","fieldinstF","entryType"), Replace=c("geno","fieldinst","genoType"))
   predictionsBind$pipeline <- paste(sort(unique(mydata$pipeline)),collapse=", ")
   ##########################################
   ## add year of origin, stage and geno code
@@ -255,7 +255,7 @@ met <- function(
   # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
 
   # write pipeline metrics
-  pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(NA,length(mu))),
+  pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(1e-6,length(mu))),
                    fieldinst=c(field,field,field),  trait=c(trt,trt,trt),
                    analysisId=id, method=c(rep("cullis",length(h2)),rep("reml",length(vg)), rep("mean",length(mu)) ),
                    traitUnits=NA, parameter=c(rep("H2",length(h2)),rep("VG",length(vg)), rep("mean",length(mu)) ),

@@ -52,7 +52,7 @@ index <- function(
   #########################################
   ## update databases
   newped <- data.frame(analysisId=id,pipeline=unique(mydata$pipeline)[1], trait="index",
-                       geno=wide0[,1], predictedValue=merit,stdError=NA,rel=NA, fieldinst="across")
+                       geno=wide0[,1], predictedValue=merit,stdError=1e-6,rel=1e-6, fieldinst="across")
   ## zdd genoType
   checks <- mydata[which(mydata[,"genoType"] == "check"),"geno"]
   newped$genoType <- "test";  areChecks <- which(newped$geno %in% checks)
@@ -114,7 +114,7 @@ index <- function(
 
   # write pipeline metrics
   pm <- data.frame(value=c(b[,1],desirev),
-                   stdError=NA,
+                   stdError=1e-6,
                    fieldinst="across",
                    trait=c( colnames(wide), colnames(wide)),
                    analysisId=id, method= ifelse(scaled,"desireScaled","desireOriginal"),

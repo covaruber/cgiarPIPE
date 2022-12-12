@@ -3,7 +3,7 @@ sta <- function(
     trait=NULL, # per trait
     fixedTerm=c("1","genoF"),
     workspace="360mb",
-    pworkspace="360mb",#wd=NULL, 
+    pworkspace="360mb",#wd=NULL,
     verbose=FALSE
 ){
 
@@ -74,7 +74,7 @@ sta <- function(
             }
           }
           # find best formula
-          mde <- asremlFormula(fixed=as.formula(paste("trait","~ 1")),
+          mde <- cgiarFTDA::asremlFormula(fixed=as.formula(paste("trait","~ 1")),
                                random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
                                rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
                                dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
@@ -97,7 +97,7 @@ sta <- function(
             glist <<- NULL
             funny <- NULL
           }else{
-            Z <- spl2Db(x.coord=mydataSub$rowcoord,y.coord=mydataSub$colcoord, at.var=NULL,at.levels=NULL, nsegments = c(10,10),
+            Z <- sommer::spl2Db(x.coord=mydataSub$rowcoord,y.coord=mydataSub$colcoord, at.var=NULL,at.levels=NULL, nsegments = c(10,10),
                         degree = c(3,3), penaltyord = c(2,2),nestorder = c(1,1),
                         minbound=NULL, maxbound=NULL, method="Lee", what="base")
             newdat <- cbind(mydataSub,Z)
@@ -110,7 +110,7 @@ sta <- function(
           ranran <- paste(c(ranran0, mde$random, funny), collapse=" + ")
           ranres <- "~dsum(~units | fieldinstF)"
           mixRandom <- try(
-            asreml(as.formula(fix),
+            asreml::asreml(as.formula(fix),
                    random= as.formula(ranran),
                    group=glist,
                    residual=as.formula(ranres),
@@ -136,7 +136,7 @@ sta <- function(
               cat(paste(ranran,"\n"))
             }
             mixFixed <- try(
-              asreml(as.formula(fix),
+              asreml::asreml(as.formula(fix),
                      random= ranran,
                      group=glist,
                      residual=as.formula(ranres),
@@ -147,8 +147,8 @@ sta <- function(
             )
             if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
 
-              pp <- predict(mixFixed, classify = "genoF", pworkspace=pworkspace,data=newdat, trace=FALSE, maxit=1)$pvals#, aliased=TRUE)
-              colnames(pp) <- replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
+              pp <- asreml::predict(mixFixed, classify = "genoF", pworkspace=pworkspace,data=newdat, trace=FALSE, maxit=1)$pvals#, aliased=TRUE)
+              colnames(pp) <- cgiarBase::replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
               pp$trait <- iTrait
               pp$fieldinstF <- iField
               pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
@@ -173,7 +173,7 @@ sta <- function(
             colnames(pp)[2] <- "predictedValue"
             pp$stdError <- 1
             pp$status <- "averaged"
-            pp$rel <- 0
+            pp$rel <- 1e-6
             pp$trait <- iTrait
             pp$fieldinstF <- iField
             pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
@@ -181,7 +181,7 @@ sta <- function(
             pp$genoYearTesting <- unique(newdat$year)[1]
             # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
             predictionsList[[counter]] <- pp;
-            h2[counter] <- 0; se[counter] <- 0 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
+            h2[counter] <- 1e-6; se[counter] <- 1e-6 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
             field[counter] <- iField; trt[counter] <- iTrait
             counter=counter+1
           } # end of is mixed model run well
@@ -192,7 +192,7 @@ sta <- function(
   }
   predictionsBind <- do.call(rbind, predictionsList)
   predictionsBind$analysisId <- id
-  colnames(predictionsBind) <- replaceValues(Source=colnames(predictionsBind), Search=c("genoF","fieldinstF","entryType"), Replace=c("geno","fieldinst","genoType"))
+  colnames(predictionsBind) <- cgiarBase::replaceValues(Source=colnames(predictionsBind), Search=c("genoF","fieldinstF","entryType"), Replace=c("geno","fieldinst","genoType"))
   predictionsBind$pipeline <- paste(sort(unique(mydata$pipeline)),collapse=", ")
   datee <- Sys.Date()
   year.mo.day <- as.numeric(strsplit(as.character(datee),"-")[[1]])# <- as.numeric(strsplit(gsub("....-","",datee),"-")[[1]])
