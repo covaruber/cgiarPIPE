@@ -52,7 +52,7 @@ ocs <- function(
            ebv[crossComb[,2],])/2  # mean parent EBVs
   K <- as.matrix(myrel)
   # OCS: Determine a crossing plan
-  plan = selectCrosses(nCross=nCross, # number of crossed to be identified using OCS
+  plan = cgiarOcs::selectCrosses(nCross=nCross, # number of crossed to be identified using OCS
                        targetAngle=targetAngle*pi/180, # 30 degrees in radians
                        u=eMP, # expected cross mean EBVs
                        G=K)   # GRM
