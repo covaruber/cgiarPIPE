@@ -62,8 +62,8 @@ gwas <- function(
     MMT <-tcrossprod(M) ## MM' = additive relationship matrix
     MMTinv<-solve(MMT + diag(1e-6, ncol(MMT), ncol(MMT))) ## inverse of MM'
     MTMMTinv<-t(M)%*%MMTinv # M' %*% (M'M)-
-    mixGBLUP <- mmer(predictedValue~1,
-                     random=~vsr(geno, Gu=MMT), rcov=~units, nIters=30,
+    mixGBLUP <- sommer::mmer(predictedValue~1,
+                     random=~sommer::vsr(geno, Gu=MMT), rcov=~units, nIters=30,
                      verbose = FALSE,
                      data=mydataSub)
     myorder <- names(mixGBLUP$U$`u:geno`$predictedValue)
