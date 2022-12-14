@@ -1,21 +1,22 @@
-sta <- function(
+staLMM <- function(
     phenoDTfile= NULL,
     trait=NULL, # per trait
     fixedTerm=c("1","genoF"),
+    randomTerm=NULL,
     workspace="360mb",
     pworkspace="360mb",#wd=NULL,
     verbose=FALSE
 ){
-
+  
   # if(is.null(wd)){wd <- getwd()}
   # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-
+  
   id <- paste("sta",idGenerator(5,5),sep="")
   type <- "sta"
   if(is.null(phenoDTfile)){stop("Please provide the name of the file to be used for analysis", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-
+  
   ###################################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
@@ -25,7 +26,7 @@ sta <- function(
   # modeling <- read.csv(file.path(wd,"modeling.csv"))
   # predictions <- read.csv(file.path(wd,"predictions.csv"))
   # pipeline_metrics <- read.csv(file.path(wd,"pipeline_metrics.csv"))
-
+  
   traitToRemove <- character()
   for(k in 1:length(trait)){
     if (!trait[k] %in% colnames(mydata)){
@@ -52,7 +53,7 @@ sta <- function(
       # remove outliers
       cleaningSub <- cleaning[which(cleaning$traitName %in% iTrait),]
       out <- which(mydataSub$rowindex %in% cleaningSub$indexRow )
-
+      
       if(length(out) > 0){mydataSub[out,"trait"] <- NA}
       # do analysis
       if(!is.na(var(mydataSub[,"trait"],na.rm=TRUE))){ # if there's variance
@@ -75,80 +76,74 @@ sta <- function(
           }
           # find best formula
           mde <- cgiarFTDA::asremlFormula(fixed=as.formula(paste("trait","~ 1")),
-                               random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
-                               rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
-                               dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
-
-                               minRandomLevels=list(rowcoordF= 3, colcoordF=3, trialF=2,repF=2, blockF=4),
-                               minResidualLevels=list(rowcoordF=5, colcoordF=5),
-
-                               exchangeRandomEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-
-                               exchangeResidualEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-
-                               customRandomLevels=NULL, customResidualLevels=NULL,
-
-                               xCoordinate= "rowcoordF",yCoordinate ="colcoordF",
-                               doubleConstraintRandom=c("rowcoordF","colcoordF"), verbose=verbose)
-
+                                          random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
+                                          rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
+                                          dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
+                                          
+                                          minRandomLevels=list(rowcoordF= 3, colcoordF=3, trialF=2,repF=2, blockF=4),
+                                          minResidualLevels=list(rowcoordF=5, colcoordF=5),
+                                          
+                                          exchangeRandomEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
+                                          
+                                          exchangeResidualEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
+                                          
+                                          customRandomLevels=NULL, customResidualLevels=NULL,
+                                          
+                                          xCoordinate= "rowcoordF",yCoordinate ="colcoordF",
+                                          doubleConstraintRandom=c("rowcoordF","colcoordF"), verbose=verbose)
+          
+          factorsFitted <- unlist(lapply(mde$used$fieldinstF,length))
+          factorsFittedGreater <- which(factorsFitted > 0)
+          
+          newRandom <- ifelse(length(factorsFittedGreater) > 0, paste(names(factorsFitted)[factorsFittedGreater], collapse = "+"), NULL  )
           # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
           if((length(mde$used$fieldinstF$rowcoordF) == 0) & (length(mde$used$fieldinstF$colcoordF) == 0)){
-            newdat <- mydataSub
-            glist <<- NULL
-            funny <- NULL
+            newSpline <- NULL
           }else{
-            Z <- sommer::spl2Db(x.coord=mydataSub$rowcoord,y.coord=mydataSub$colcoord, at.var=NULL,at.levels=NULL, nsegments = c(10,10),
-                        degree = c(3,3), penaltyord = c(2,2),nestorder = c(1,1),
-                        minbound=NULL, maxbound=NULL, method="Lee", what="base")
-            newdat <- cbind(mydataSub,Z)
-            glist <<- list(field=1:ncol(Z) + ncol(mydataSub)); #names(glist) <- "field"
-            funny <- paste0("grp(","field",")")
+            newSpline = as.formula("~LMMsolver::spl2D(x1 = rowcoord, x2 = colcoord, nseg = c(10, 10))")
           }
-          fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
-          ranran0 <-"~genoF" # simple formula, can be more complex
-
-          ranran <- paste(c(ranran0, mde$random, funny), collapse=" + ")
-          ranres <- "~dsum(~units | fieldinstF)"
+          
+          randomTermForRanModel <- c(randomTerm,"genoF")
+          fixedTermForRanModel <- setdiff(fixedTerm,randomTermForRanModel)
+          fix <- paste("trait ~",paste(fixedTermForRanModel, collapse = " + "))
+          # randomTerm <- setdiff(randomTerm, fixedTerm)
+          ranran <- paste(c(randomTermForRanModel, newRandom), collapse=" + ")
+          ranran <- paste("~",ranran)
+          
           mixRandom <- try(
-            asreml::asreml(as.formula(fix),
-                   random= as.formula(ranran),
-                   group=glist,
-                   residual=as.formula(ranres),
-                   na.action = na.method(x="include",y="include"),
-                   trace=FALSE,
-                   data=newdat, maxiter=50),
+            LMMsolver::LMMsolve(fixed =as.formula(fix),
+                             random = as.formula(ranran),
+                             spline = newSpline, #trace = TRUE, 
+                             data = mydataSub, maxit = 100),
             silent = TRUE
           );  # mixRandom <- update(mixRandom, maxiter=5)
-
-
+          
           # only keep variance components that were greater than zero
           if(!inherits(mixRandom,"try-error") ){ # if random model runs well try the fixed model
-            sm <- summary(mixRandom)$varcomp;
-            fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
-            newRanran <- setdiff(rownames(sm)[which(sm[,1] >0.05)],c("fieldinstF!R","genoF"))
-            newRanran <- gsub("):","' ):",gsub(", ",", '", newRanran))
+            sm <- summary(mixRandom, which = "variances")
+            newRanran <- setdiff((sm[,1])[which(sm[,2] >0.05)],c("residual","genoF"))
             ranran <- paste("~",paste(c(newRanran), collapse=" + "))
-            if(ranran=="~ "){ranran=~NULL; glist<<- NULL}else{ranran <- as.formula(ranran)}
+            if(ranran=="~ "){ranran=NULL}else{ranran <- as.formula(ranran)}
             rownames(sm) <- NULL
             if(verbose){
               print(sm)
               cat(paste(iTrait," ~",paste(fixedTerm, collapse = " + ")," \n"))
               cat(paste(ranran,"\n"))
             }
+            fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
             mixFixed <- try(
-              asreml::asreml(as.formula(fix),
-                     random= ranran,
-                     group=glist,
-                     residual=as.formula(ranres),
-                     na.action = na.method(x="include",y="include"),
-                     trace=FALSE,
-                     data=newdat, maxiter=50, workspace=workspace),
+              LMMsolver::LMMsolve(fixed =as.formula(fix),
+                                  random = ranran,
+                                  spline = newSpline, #trace = TRUE, 
+                                  data = mydataSub, maxit = 100),
               silent = TRUE
             )
             if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
-
-              pp <- asreml::predict(mixFixed, classify = "genoF", pworkspace=pworkspace,data=newdat, trace=FALSE, maxit=1)$pvals#, aliased=TRUE)
-              colnames(pp) <- cgiarBase::replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
+              
+              predictedValue <- mixFixed$coefficients$genoF + mixFixed$coefficients$`(Intercept)`
+              stdError <- (sqrt(diag(as.matrix(solve(mixFixed$C)))))[1:length(predictedValue)]
+              genoF <- gsub("genoF_","", names(predictedValue))
+              pp <- data.frame(genoF,predictedValue,stdError)
               pp$trait <- iTrait
               pp$fieldinstF <- iField
               pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
@@ -156,16 +151,16 @@ sta <- function(
               pp$genoYearTesting <- unique(newdat$year)[1]
               # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
               ## heritabilities
-              vr <- paste0("V",grep("fieldinstF!R",rownames(summary(mixRandom)$varcomp)))
-              vg <- paste0("V",grep("genoF",rownames(summary(mixRandom)$varcomp)))
-              h2Pred <- vpredict(mixRandom,  as.formula(paste0("~(",vg,")/(",vg,"+",vr,")")) )
+              ss = mixRandom$VarDf#summary(mixRandom, which = "variances")
+              rownames(ss) <- ss$VarComp
+              vg <- ss["genoF",2]; vr <- ss["residual",2]
+              h2[counter] <-  vg / (vg+vr) ; se[counter] <- 0
               ## reliability
-              pp$rel <- 1 - (pp$stdError^2)/(2*summary(mixRandom)$varcomp[as.numeric(gsub("V","",vg)),"component"])
+              pp$rel <- abs(1 - (pp$stdError^2)/(vg))
               predictionsList[[counter]] <- pp;
-              h2[counter] <- h2Pred$Estimate[1]; se[counter] <- h2Pred$SE[1] # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
               field[counter] <- iField; trt[counter] <- iTrait
               counter=counter+1
-
+              
             } # end of if fixed model run well
           }else{ # if there was singularities we just take means and assigna h2 of zero
             if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
@@ -185,7 +180,7 @@ sta <- function(
             field[counter] <- iField; trt[counter] <- iTrait
             counter=counter+1
           } # end of is mixed model run well
-
+          
         }
       }
     }
@@ -233,12 +228,12 @@ sta <- function(
     randomModel = setdiff(as.character(ranran),"~"),residualModel = ranres,h2Threshold = NA
   )
   # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-
+  
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-
+  
   # write pipeline metrics
   pm <- data.frame(value=h2,stdError=se, fieldinst=field,trait=trt,
                    analysisId=id, method="ratio",traitUnits=NA,
@@ -247,10 +242,10 @@ sta <- function(
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-
+  
   if(verbose){
-  cat(paste("Your analysis id is:",id,"\n"))
-  # cat(paste("Your results will be available in the predictions database under such id \n"))
+    cat(paste("Your analysis id is:",id,"\n"))
+    # cat(paste("Your results will be available in the predictions database under such id \n"))
   }
   result <- list(metrics=pm, predictions=predictionsBind[,predcols], modeling=mod, metadata=db.params,
                  cleaned=NA, outliers=NA, desire=NA, id=id)

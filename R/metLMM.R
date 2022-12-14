@@ -1,34 +1,27 @@
-met <- function(
+metLMM <- function(
     phenoDTfile= NULL, # analysis to be picked from predictions database
     fixedTerm= c("fieldinstF"),
     randomTerm=c("genoF"),
     residualBy=NULL,
-    sparseTerm=NULL,
     interactionsWithGeno=NULL,
     trait= NULL, # per trait
     heritLB= 0.15,
     heritUB= 0.95,
-    workspace="900mb",
-    pworkspace="900mb",
     scaledDesire=TRUE,# wd=NULL, 
     verbose=TRUE
 ){
-
-  # if(is.null(wd)){wd <- getwd()}
-  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-
+  
   id <- paste("met",idGenerator(5,5),sep="")
   type <- "met"
   if(is.null(phenoDTfile)){stop("Please provide the name of the analysis to locate the predictions", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-
+  
   ############################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   mydata <- phenoDTfile$predictions #readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
   pipeline_metrics <- phenoDTfile$metrics #readRDS(file.path(wd,"metrics",paste0(phenoDTfile)))
-
+  
   utraits <- unique(mydata$trait)
   traitToRemove <- character()
   for(k in 1:length(trait)){
@@ -65,7 +58,7 @@ met <- function(
     pipeline_metricsSub <- pipeline_metrics[which(pipeline_metrics$trait == iTrait & pipeline_metrics$parameter == "H2"),]
     goodFields <- pipeline_metricsSub[which((pipeline_metricsSub$value > heritLB) & (pipeline_metricsSub$value < heritUB)),"fieldinst"]
     mydataSub <- mydataSub[which(mydataSub$fieldinst %in% goodFields),]
-
+    
     mydataSub$genoF <- as.factor(mydataSub$geno)
     mydataSub$fieldinstF <- as.factor(mydataSub$fieldinst)
     mydataSub$pipelineF <- as.factor(mydataSub$pipeline)
@@ -73,46 +66,47 @@ met <- function(
     mydataSub$genoYearOriginF <- as.factor(mydataSub$genoYearOrigin)
     mydataSub$genoYearTestingF <- as.factor(mydataSub$genoYearTesting)
     mydataSub <- mydataSub[which(mydataSub$geno != ""),]
-    # for(fi in 1:length(fixedTerm)){
-    #   mydataSub[,paste0(fixedTerm[fi],"F")] <- as.factor(mydataSub[,fixedTerm[fi]])
-    # }
-    # fixedTerm2 <- paste0(fixedTerm,"F")
-
-    # mydataSub$genoF <- as.factor(mydataSub$geno)
-    # mydataSub$
+    
     # do analysis
     if(!is.na(var(mydataSub[,"predictedValue"],na.rm=TRUE))){ # if there's variance
       if( var(mydataSub[,"predictedValue"], na.rm = TRUE) > 0 ){
         checks <- mydataSub[which(mydataSub[,"genoType"] == "check"),"geno"]
-
+        # make sure the terms to be fitted have more than one level
+        if(!is.null(rTerms)){
+          rTermsTrait <- rTerms[which(apply(data.frame(rTerms),1,function(x){length(table(mydataSub[,x]))}) > 1)] 
+        }else{rTermsTrait=NULL}
+        if(!is.null(fixedTerm)){
+          fixedTermTrait <- fixedTerm[which(apply(data.frame(setdiff(fixedTerm,"1")),1,function(x){length(table(mydataSub[,x]))}) > 1)]
+          fixedTermTrait <- c(fixedTermTrait,"1")
+        }else{fixedTermTrait=NULL}
+        if(!is.null(residualBy)){
+          residualByTrait <- residualBy[which(apply(data.frame(residualBy),1,function(x){length(table(mydataSub[,x]))}) > 1)]
+          if(length(residualByTrait) == 0){residualByTrait=NULL}
+        }else{residualByTrait=NULL}
+        
+        
         if(!is.null(interactionsWithGeno)){
           interacs <- expand.grid("genoF",interactionsWithGeno)
           interacs<- as.data.frame(interacs[which(as.character(interacs[,1]) != as.character(interacs[,2])),])
           interacsUnlist <- apply(interacs,1,function(x){paste(x,collapse = ":")})
-          rTerms <- c(randomTerm,interacsUnlist)
+          rTermsTrait <- c(randomTerm,interacsUnlist)
         }else{
-          rTerms <- randomTerm
+          rTermsTrait <- randomTerm
         }
-        rTerms <- setdiff(rTerms, fixedTerm)
-        rTerms <- setdiff(rTerms, sparseTerm)
-        if(length(rTerms) == 0){
-          ranran <- "~NULL"
+        rTermsTrait <- setdiff(rTermsTrait, fixedTermTrait)
+        if(length(rTermsTrait) == 0){
+          ranran <- NULL#"~NULL"
         }else{
-          ranran <- paste("~",paste(rTerms, collapse=" + ") )
+          ranran <- paste("~",paste(rTermsTrait, collapse=" + ") )
         }
-        if(length(sparseTerm) == 0){
-          spar <- "~NULL"
-        }else{
-          spar <- paste("~",paste(sparseTerm, collapse="+") )
-        }
-        fix <- paste("predictedValue ~",paste(fixedTerm, collapse=" + "))
+        fix <- paste("predictedValue ~",paste(fixedTermTrait, collapse=" + "))
         # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
-        if(!is.null(residualBy)){
-          ranres <- paste0("~dsum(~units | ",residualBy,")")
+        if(!is.null(residualByTrait)){
+          ranres <- as.formula(paste0("~",residualByTrait,""))
         }else{
-          ranres <- "~units"
+          ranres <- NULL#"~units"
         }
-
+        
         mydataSub=mydataSub[with(mydataSub, order(fieldinstF)), ]
         mydataSub$w <- 1/(mydataSub$stdError^2)
         if(verbose){
@@ -121,29 +115,26 @@ met <- function(
         }
         # mydataSub2 <- mydataSub[which(mydataSub$predictedValue > 0),]
         mix <- try(
-          asreml::asreml(as.formula(fix),
-                 random= as.formula(ranran),
-                 sparse = as.formula(spar),
-                 # group=prov$glist,
-                 residual=as.formula(ranres),
-                 weights = w,
-                 workspace=workspace,
-                 trace=verbose,
-                 family = asreml::asr_gaussian(dispersion = 1),
-                 na.action = na.method(x="exclude",y="include"), # make sure that observations with NA are removed when using weights
-                 data=mydataSub, maxiter=50),
+          LMMsolver::LMMsolve(fixed =as.formula(fix),
+                              random = as.formula(ranran),
+                              residual=ranres,
+                              weights = "w",
+                              #trace = TRUE, 
+                              data = mydataSub, maxit = 100),
           silent = TRUE
-        );
+        )
         if(!inherits(mix,"try-error") ){ # if random model runs well try the fixed model
-          pp0 <- asreml::predict(mix, classify = "genoF", pworkspace=pworkspace, aliased=TRUE, trace=verbose, maxit=1)#, aliased=TRUE)
-          pp <- pp0$pvals
-          colnames(pp) <- cgiarBase::replaceValues(Source=colnames(pp), Search=c("predicted.value","std.error"), Replace=c("predictedValue","stdError"))
-          pp$rel <- 1 - (pp$stdError^2 / (2*sum(summary(mix)$varcomp[1:2,1])))
+          predictedValue <- mix$coefficients$genoF + mix$coefficients$`(Intercept)`
+          stdError <- (sqrt(diag(as.matrix(solve(mix$C)))))[1:length(predictedValue)]
+          genoF <- gsub("genoF_","", names(predictedValue))
+          pp <- data.frame(genoF,predictedValue,stdError)
+          ss = mix$VarDf; rownames(ss) <- ss$VarComp
+          vg <- ss["genoF",2]; vr <- ss["residual",2]
+          pp$rel <- abs(1 - (pp$stdError^2)/(vg))
           ## heritabilities
-          h2Pred <- 1 - pp0$avsed/(2*sum(summary(mix)$varcomp[1:2,1]))
-          h2[counter] <- h2Pred; h2.se[counter] <- 1e-6
+          h2[counter] <- mean(pp$rel); h2.se[counter] <- 1e-6
           ## genetic variances
-          vg[counter] <- sum(summary(mix)$varcomp[1:2,1]); vg.se[counter] <- sum(summary(mix)$varcomp[1:2,2])
+          vg[counter] <- vg; vg.se[counter] <- 1e-6
         }else{
           if(verbose){ cat(paste("Aggregating and assuming h2 = 0 \n"))}
           pp <- aggregate(predictedValue ~ genoF, FUN=mean, data=mydataSub)
@@ -240,20 +231,20 @@ met <- function(
     traitLb = NA,
     traitUb = NA,
     outlierCoef = NA,
-    analysisId = id,
-    analysisType = type,
-    fixedModel = fix,
-    randomModel = ranran,
-    residualModel = ranres,
-    h2Threshold = paste(c(heritLB,heritUB),collapse=" , ")
+    analysisId = rep(id,length(trait)),
+    analysisType =rep(type,length(trait)) ,
+    fixedModel = rep(fix,length(trait)),
+    randomModel = rep(ranran,length(trait)),
+    residualModel = ifelse(is.null(ranres),NA,rep(ranres,length(trait))),
+    h2Threshold = rep(paste(c(heritLB,heritUB),collapse=" , "),length(trait))
   )
   # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-
+  
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-
+  
   # write pipeline metrics
   pm <- data.frame(value=c(h2,vg,mu),  stdError=c(h2.se,vg.se,rep(1e-6,length(mu))),
                    fieldinst=c(field,field,field),  trait=c(trt,trt,trt),
@@ -265,7 +256,7 @@ met <- function(
   # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
   # save desire file
   des <- desire(trait=trait,h2=h2, G=G
-         # pathFile=file.path(wd,"desire",paste0("desire_",id,".txt"))
+                # pathFile=file.path(wd,"desire",paste0("desire_",id,".txt"))
   )
   ##
   if(verbose){

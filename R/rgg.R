@@ -143,7 +143,7 @@ rgg <- function(
     analysisId	= id,
     analysisType =	type,
     fieldbooks	= NA,
-    phenoDataFile =	NA,
+    phenoDataFile =	phenoDTfile$id,
     markerbooks	= NA,  markerDataFile =	NA,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
