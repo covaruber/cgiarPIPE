@@ -19,7 +19,7 @@ grm <- function(
 
   ############################
   # calculate the relationship matrix
-  A <- A.mat(M0$M)
+  A <- sommer::A.mat(M0$M)
 
   #########################################
   ## update databases
