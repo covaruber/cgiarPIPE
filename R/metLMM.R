@@ -72,8 +72,8 @@ metLMM <- function(
       if( var(mydataSub[,"predictedValue"], na.rm = TRUE) > 0 ){
         checks <- mydataSub[which(mydataSub[,"genoType"] == "check"),"geno"]
         # make sure the terms to be fitted have more than one level
-        if(!is.null(rTerms)){
-          rTermsTrait <- rTerms[which(apply(data.frame(rTerms),1,function(x){length(table(mydataSub[,x]))}) > 1)] 
+        if(!is.null(randomTerm)){
+          rTermsTrait <- randomTerm[which(apply(data.frame(randomTerm),1,function(x){length(table(mydataSub[,x]))}) > 1)] 
         }else{rTermsTrait=NULL}
         if(!is.null(fixedTerm)){
           fixedTermTrait <- fixedTerm[which(apply(data.frame(setdiff(fixedTerm,"1")),1,function(x){length(table(mydataSub[,x]))}) > 1)]
@@ -89,9 +89,9 @@ metLMM <- function(
           interacs <- expand.grid("genoF",interactionsWithGeno)
           interacs<- as.data.frame(interacs[which(as.character(interacs[,1]) != as.character(interacs[,2])),])
           interacsUnlist <- apply(interacs,1,function(x){paste(x,collapse = ":")})
-          rTermsTrait <- c(randomTerm,interacsUnlist)
+          rTermsTrait <- c(rTermsTrait,interacsUnlist)
         }else{
-          rTermsTrait <- randomTerm
+          rTermsTrait <- rTermsTrait
         }
         rTermsTrait <- setdiff(rTermsTrait, fixedTermTrait)
         if(length(rTermsTrait) == 0){
