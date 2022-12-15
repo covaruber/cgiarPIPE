@@ -2,9 +2,6 @@ staLMM <- function(
     phenoDTfile= NULL,
     trait=NULL, # per trait
     fixedTerm=c("1","genoF"),
-    randomTerm=NULL,
-    workspace="360mb",
-    pworkspace="360mb",#wd=NULL,
     verbose=FALSE
 ){
   
@@ -95,7 +92,8 @@ staLMM <- function(
           factorsFitted <- unlist(lapply(mde$used$fieldinstF,length))
           factorsFittedGreater <- which(factorsFitted > 0)
           
-          newRandom <- ifelse(length(factorsFittedGreater) > 0, paste(names(factorsFitted)[factorsFittedGreater], collapse = "+"), NULL  )
+          newRandom <- ifelse(length(factorsFittedGreater) > 0, names(factorsFitted)[factorsFittedGreater], NA  )
+          if(is.na(newRandom)){newRandom=NULL}
           # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
           if((length(mde$used$fieldinstF$rowcoordF) == 0) & (length(mde$used$fieldinstF$colcoordF) == 0)){
             newSpline <- NULL
@@ -103,7 +101,7 @@ staLMM <- function(
             newSpline = as.formula("~LMMsolver::spl2D(x1 = rowcoord, x2 = colcoord, nseg = c(10, 10))")
           }
           
-          randomTermForRanModel <- c(randomTerm,"genoF")
+          randomTermForRanModel <- c(newRandom,"genoF")
           fixedTermForRanModel <- setdiff(fixedTerm,randomTermForRanModel)
           fix <- paste("trait ~",paste(fixedTermForRanModel, collapse = " + "))
           # randomTerm <- setdiff(randomTerm, fixedTerm)
@@ -112,9 +110,9 @@ staLMM <- function(
           
           mixRandom <- try(
             LMMsolver::LMMsolve(fixed =as.formula(fix),
-                             random = as.formula(ranran),
-                             spline = newSpline, #trace = TRUE, 
-                             data = mydataSub, maxit = 100),
+                                random = as.formula(ranran),
+                                spline = newSpline, #trace = TRUE, 
+                                data = mydataSub, maxit = 100),
             silent = TRUE
           );  # mixRandom <- update(mixRandom, maxiter=5)
           
@@ -148,8 +146,7 @@ staLMM <- function(
               pp$fieldinstF <- iField
               pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
               if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
-              pp$genoYearTesting <- unique(newdat$year)[1]
-              # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
+              pp$genoYearTesting <- unique(mydataSub$year)[1]
               ## heritabilities
               ss = mixRandom$VarDf#summary(mixRandom, which = "variances")
               rownames(ss) <- ss$VarComp
@@ -164,7 +161,7 @@ staLMM <- function(
             } # end of if fixed model run well
           }else{ # if there was singularities we just take means and assigna h2 of zero
             if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
-            pp <- aggregate(trait ~ genoF, FUN=mean, data=newdat)
+            pp <- aggregate(trait ~ genoF, FUN=mean, data=mydataSub)
             colnames(pp)[2] <- "predictedValue"
             pp$stdError <- 1
             pp$status <- "averaged"
@@ -173,8 +170,7 @@ staLMM <- function(
             pp$fieldinstF <- iField
             pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
             if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
-            pp$genoYearTesting <- unique(newdat$year)[1]
-            # pp$genoYearOrigin<- unique(newdat$genoYearOrigin)[1]
+            pp$genoYearTesting <- unique(mydataSub$year)[1]
             predictionsList[[counter]] <- pp;
             h2[counter] <- 1e-6; se[counter] <- 1e-6 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
             field[counter] <- iField; trt[counter] <- iTrait
@@ -225,7 +221,7 @@ staLMM <- function(
   mod <- data.frame(
     trait = trait, traitLb = NA,traitUb = NA,outlierCoef = NA,
     analysisId = id,analysisType = type,fixedModel = fix,
-    randomModel = setdiff(as.character(ranran),"~"),residualModel = ranres,h2Threshold = NA
+    randomModel = ifelse(is.null(ranran),NA,setdiff(as.character(ranran),"~")),residualModel = "units",h2Threshold = NA
   )
   # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
   
