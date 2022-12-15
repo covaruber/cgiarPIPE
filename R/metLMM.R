@@ -59,6 +59,8 @@ metLMM <- function(
     goodFields <- pipeline_metricsSub[which((pipeline_metricsSub$value > heritLB) & (pipeline_metricsSub$value < heritUB)),"fieldinst"]
     mydataSub <- mydataSub[which(mydataSub$fieldinst %in% goodFields),]
 
+    if(nrow(mydataSub) == 0){stop(paste("There was no predictions to work with in trait",iTrait,". Please look at your H2 boundaries. You may be discarding all fields."),call. = FALSE)}
+
     mydataSub$genoF <- as.factor(mydataSub$geno)
     mydataSub$fieldinstF <- as.factor(mydataSub$fieldinst)
     mydataSub$pipelineF <- as.factor(mydataSub$pipeline)
