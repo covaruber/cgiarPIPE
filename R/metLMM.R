@@ -240,7 +240,7 @@ metLMM <- function(
     analysisType =rep(type,length(trait)) ,
     fixedModel = rep(fix,length(trait)),
     randomModel = rep(ranran,length(trait)),
-    residualModel = ifelse(is.null(ranres),NA,rep(ranres,length(trait))),
+    residualModel = ifelse(is.null(ranres),NA,rep(as.character(ranres),length(trait))),
     h2Threshold = rep(paste(c(heritLB,heritUB),collapse=" , "),length(trait))
   )
   # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
