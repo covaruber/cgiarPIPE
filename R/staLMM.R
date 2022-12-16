@@ -4,16 +4,16 @@ staLMM <- function(
     fixedTerm=c("1","genoF"),
     verbose=FALSE
 ){
-  
+
   # if(is.null(wd)){wd <- getwd()}
   # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
   # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-  
+
   id <- paste("sta",idGenerator(5,5),sep="")
   type <- "sta"
   if(is.null(phenoDTfile)){stop("Please provide the name of the file to be used for analysis", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-  
+
   ###################################
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
@@ -23,7 +23,7 @@ staLMM <- function(
   # modeling <- read.csv(file.path(wd,"modeling.csv"))
   # predictions <- read.csv(file.path(wd,"predictions.csv"))
   # pipeline_metrics <- read.csv(file.path(wd,"pipeline_metrics.csv"))
-  
+
   traitToRemove <- character()
   for(k in 1:length(trait)){
     if (!trait[k] %in% colnames(mydata)){
@@ -42,7 +42,7 @@ staLMM <- function(
   predictionsList <- list(); counter=1
   for(iTrait in trait){ # iTrait=trait[1]
     if(verbose){cat(paste("Analyzing trait", iTrait,"\n"))}
-    for(iField in fields){ # iField = fields[1]# "2019_WS_BINA_Regional_Station_Barishal"
+    for(iField in fields){ # iField = fields[2]# "2019_WS_BINA_Regional_Station_Barishal"
       if(verbose){cat(paste("Analyzing field", iField,"\n"))}
       # subset data
       mydataSub <- droplevels(mydata[which(as.character(mydata$fieldinstF) %in% iField),])
@@ -50,7 +50,7 @@ staLMM <- function(
       # remove outliers
       cleaningSub <- cleaning[which(cleaning$traitName %in% iTrait),]
       out <- which(mydataSub$rowindex %in% cleaningSub$indexRow )
-      
+
       if(length(out) > 0){mydataSub[out,"trait"] <- NA}
       # do analysis
       if(!is.na(var(mydataSub[,"trait"],na.rm=TRUE))){ # if there's variance
@@ -76,22 +76,22 @@ staLMM <- function(
                                           random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
                                           rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
                                           dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
-                                          
+
                                           minRandomLevels=list(rowcoordF= 3, colcoordF=3, trialF=2,repF=2, blockF=4),
                                           minResidualLevels=list(rowcoordF=5, colcoordF=5),
-                                          
+
                                           exchangeRandomEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                                          
+
                                           exchangeResidualEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                                          
+
                                           customRandomLevels=NULL, customResidualLevels=NULL,
-                                          
+
                                           xCoordinate= "rowcoordF",yCoordinate ="colcoordF",
                                           doubleConstraintRandom=c("rowcoordF","colcoordF"), verbose=verbose)
-          
+
           factorsFitted <- unlist(lapply(mde$used$fieldinstF,length))
           factorsFittedGreater <- which(factorsFitted > 0)
-          
+
           newRandom <- ifelse(length(factorsFittedGreater) > 0, names(factorsFitted)[factorsFittedGreater], NA  )
           if(is.na(newRandom)){newRandom=NULL}
           # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
@@ -100,22 +100,22 @@ staLMM <- function(
           }else{
             newSpline = as.formula("~LMMsolver::spl2D(x1 = rowcoord, x2 = colcoord, nseg = c(10, 10))")
           }
-          
+
           randomTermForRanModel <- c(newRandom,"genoF")
           fixedTermForRanModel <- setdiff(fixedTerm,randomTermForRanModel)
           fix <- paste("trait ~",paste(fixedTermForRanModel, collapse = " + "))
           # randomTerm <- setdiff(randomTerm, fixedTerm)
-          ranran <- paste(c(randomTermForRanModel, newRandom), collapse=" + ")
+          ranran <- paste(unique(c(randomTermForRanModel, newRandom)), collapse=" + ")
           ranran <- paste("~",ranran)
-          
+
           mixRandom <- try(
             LMMsolver::LMMsolve(fixed =as.formula(fix),
                                 random = as.formula(ranran),
-                                spline = newSpline, #trace = TRUE, 
+                                spline = newSpline, #trace = TRUE,
                                 data = mydataSub, maxit = 100),
             silent = TRUE
           );  # mixRandom <- update(mixRandom, maxiter=5)
-          
+
           # only keep variance components that were greater than zero
           if(!inherits(mixRandom,"try-error") ){ # if random model runs well try the fixed model
             sm <- summary(mixRandom, which = "variances")
@@ -132,12 +132,12 @@ staLMM <- function(
             mixFixed <- try(
               LMMsolver::LMMsolve(fixed =as.formula(fix),
                                   random = ranran,
-                                  spline = newSpline, #trace = TRUE, 
+                                  spline = newSpline, #trace = TRUE,
                                   data = mydataSub, maxit = 100),
               silent = TRUE
             )
             if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
-              
+
               predictedValue <- mixFixed$coefficients$genoF + mixFixed$coefficients$`(Intercept)`
               stdError <- (sqrt(diag(as.matrix(solve(mixFixed$C)))))[1:length(predictedValue)]
               genoF <- gsub("genoF_","", names(predictedValue))
@@ -157,7 +157,7 @@ staLMM <- function(
               predictionsList[[counter]] <- pp;
               field[counter] <- iField; trt[counter] <- iTrait
               counter=counter+1
-              
+
             } # end of if fixed model run well
           }else{ # if there was singularities we just take means and assigna h2 of zero
             if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
@@ -176,7 +176,7 @@ staLMM <- function(
             field[counter] <- iField; trt[counter] <- iTrait
             counter=counter+1
           } # end of is mixed model run well
-          
+
         }
       }
     }
@@ -224,12 +224,12 @@ staLMM <- function(
     randomModel = ifelse(is.null(ranran),NA,setdiff(as.character(ranran),"~")),residualModel = "units",h2Threshold = NA
   )
   # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-  
+
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
   # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
-  
+
   # write pipeline metrics
   pm <- data.frame(value=h2,stdError=se, fieldinst=field,trait=trt,
                    analysisId=id, method="ratio",traitUnits=NA,
@@ -238,7 +238,7 @@ staLMM <- function(
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
   # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-  
+
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     # cat(paste("Your results will be available in the predictions database under such id \n"))
