@@ -75,6 +75,6 @@ pca <- function(
     cat(paste("Your results will be available in the files_cleaned folder under such id \n"))
   }
   result <- list(metrics=pm, predictions=predictionsBind[,predcols], modeling=NA, metadata=db.params,
-                 cleaned=A, outliers=NA, desire=NA, id=id)
+                 cleaned=NA, outliers=NA, desire=NA, id=id)
   return(result)
 }
