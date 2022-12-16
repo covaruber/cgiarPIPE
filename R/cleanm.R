@@ -62,7 +62,7 @@ cleanm <- function(
     analysisType =	type,
     fieldbooks	= NA,
     phenoDataFile =	NA,
-    markerbooks	= NA,  markerDataFile =	markerDTfile,
+    markerbooks	= NA,  markerDataFile =	markerDTfile$id,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
     geno = NA,  rep	= NA,  block =	NA,
