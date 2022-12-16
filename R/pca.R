@@ -34,7 +34,7 @@ pca <- function(
 
   pcaList <- list(); colnamespca <- colnames(pca); counter1 <- 1
   for(iCol in 1:nPC){
-    pcaList[[counter1]] <- data.frame(analysisId=id, pipeline=paste(unique(mydata$pipeline), collapse = ", "),
+    pcaList[[counter1]] <- data.frame(analysisId=id, pipeline="unknown",
                                       trait=paste("marker",colnamespca[iCol], sep="-"), geno=rownames(pca),
                                       genoType="test",fieldinst="across", predictedValue=pca[,iCol],
                                       stdError=1, rel=1, genoYearOrigin=1, genoYearTesting=1, stage="unknown",
