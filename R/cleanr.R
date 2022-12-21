@@ -29,26 +29,8 @@ cleanr <- function(
   ############################
   ## nrm calculation
 
-  ids <- unique(c(mydata[,dam], mydata[,sire], mydata[,indiv]))
-  idsDf <- data.frame(idsn = 1:length(ids)); rownames(idsDf) <- ids
   orPed <- unique(mydata[,c(indiv,dam,sire)])
-
-  orPedN <- apply(orPed,2,function(x){ # not sure why is working for the  "" genotypes but is working :)
-    idsDf[as.character(x),]
-  })
-  # which dams and sires are not part of the df
-  damsToAdd <- setdiff(orPedN[,dam],orPedN[,indiv])
-  siresToAdd <- setdiff(orPedN[,sire],orPedN[,indiv])
-
-  damsToAddDf <- data.frame(damsToAdd,NA,NA); colnames(damsToAddDf) <- colnames(orPedN)
-  siresToAddDf <- data.frame(siresToAdd,NA,NA); colnames(siresToAddDf) <- colnames(orPedN)
-  orPedN2 <- rbind(damsToAddDf,siresToAddDf,orPedN)
-
-  ped <- pedigreemm::pedigree(sire = orPedN2[,sire],
-                  dam  = orPedN2[,dam], label= orPedN2[,indiv])
-
-  A <- as.matrix(pedigreemm::getA(ped))
-  # Ai <-pedigreemm::getAInv(ped)
+  colnames(orPed) <- c("indiv","dam","sire")
 
   #########################################
   ## update databases
@@ -73,6 +55,6 @@ cleanr <- function(
     cat(paste("Your analysis id is:",id,"\n"))
   }
   result <- list(metrics=NA, predictions=NA, modeling=NA, metadata=db.params,
-                 cleaned=A, outliers=NA, desire=NA, id=id)
+                 cleaned=orPed, outliers=NA, desire=NA, id=id)
   return(result)#
 }

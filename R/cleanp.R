@@ -10,7 +10,7 @@ cleanp <- function(
   trait= NULL, fieldinst= c("year", "season", "location"),
   # outlier cleaning parameters
   outlierCoef= 1.5,
-  traitLB = 0.01, traitUB= Inf,# wd=NULL, 
+  traitLB = 0.01, traitUB= Inf,# wd=NULL,
   verbose=FALSE
 ){
   #
@@ -143,7 +143,6 @@ cleanp <- function(
     analysisType = type, fixedModel = NA,randomModel = NA,
     residualModel = NA,h2Threshold = NA
   )
-  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
   # modeling <- unique(rbind(modeling, mod[,colnames(modeling)]))
   # write.csv(modeling, file = file.path(wd,"modeling.csv"),row.names = FALSE)
 
