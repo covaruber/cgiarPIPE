@@ -8,6 +8,8 @@ metLMM <- function(
     heritLB= 0.15,
     heritUB= 0.95,
     scaledDesire=TRUE,# wd=NULL,
+    genoAmatrix=NULL,
+    maxit=50,
     verbose=TRUE
 ){
 
@@ -36,7 +38,7 @@ metLMM <- function(
   # remove outliers from each fieldinst
   fields <- unique(mydata$fieldinst)
   mydata$rowindex <- 1:nrow(mydata)
-  for(iTrait in trait){
+  for(iTrait in trait){ # iTrait = trait[1]
     for(kField in 1:length(fields)){
       subData <- mydata[which((mydata$fieldinst == fields[kField]) & mydata$trait == iTrait ),]
       outlier <- boxplot.stats(x=subData$predictedValue,coef=2 )$out
@@ -50,7 +52,7 @@ metLMM <- function(
   ## met analysis
   h2 <- vg <- cl <-vg.se <- h2.se <- cl.se <- mu <- numeric(); field <- trt <- vector()
   predictionsList <- list(); counter=1
-  for(iTrait in trait){ # iTrait="GYKGPHA"
+  for(iTrait in trait){ # # iTrait = trait[1]  iTrait="GYKGPHA"
     if(verbose){cat(paste("Analyzing trait", iTrait,"\n"))}
     # subset data
     mydataSub <- droplevels(mydata[which(mydata$trait == iTrait),])
@@ -81,8 +83,10 @@ metLMM <- function(
           fixedTermTraitMinus <- setdiff(fixedTerm,"1")
           if(length(fixedTermTraitMinus) > 0){
             fixedTermTrait <- fixedTerm[which(apply(data.frame(fixedTermTraitMinus),1,function(x){length(table(mydataSub[,x]))}) > 1)]
+            fixedTermTrait <- c("1",fixedTermTrait)
+          }else{
+            fixedTermTrait <- fixedTerm
           }
-          fixedTermTrait <- fixedTerm
         }else{fixedTermTrait=NULL}
         if(!is.null(residualBy)){
           residualByTrait <- residualBy[which(apply(data.frame(residualBy),1,function(x){length(table(mydataSub[,x]))}) > 1)]
@@ -118,14 +122,40 @@ metLMM <- function(
           cat(fix,"\n")
           cat(ranran,"\n")
         }
+
+        if(is.null(genoAmatrix)){
+          # make sure the matrix only uses the leves for individuals with data
+          genoFlevels <- unique(mydataSub[which(!is.na(mydataSub[,"predictedValue"])),"genoF"])
+          Ainv <- diag(length(genoFlevels))
+          colnames(Ainv) <- rownames(Ainv) <- genoFlevels
+        }else{
+          genoFlevels <- as.character(unique(mydataSub[which(!is.na(mydataSub[,"predictedValue"])),"genoF"]))
+          A <- genoAmatrix$cleaned
+          inter <- intersect(genoFlevels,colnames(A)) # go for sure
+          differ <- setdiff(inter,genoFlevels) # are missing
+          if(length(inter) > 0){
+            A1 <- A[inter,inter]
+            A1inv <- solve(A1 + diag(1e-5,ncol(A1), ncol(A1)))
+          }else{A1inv <- matrix(0,0,0)}
+          if(length(differ) > 0){
+            A2inv <- diag(length(differ))
+            colnames(A2inv) <- rownames(A2inv) <- differ
+          }else{A2inv <- matrix(0,0,0)}
+          Ainv <- sommer::adiag1(A1inv,A2inv)
+          colnames(Ainv) <- rownames(Ainv) <- c(colnames(A1inv), colnames(A2inv))
+        }
+
+        myGinverse <- ifelse("genoF" %in% rTermsTrait, list(genoF=Ainv), NULL)
+        if(!is.null(myGinverse)){names(myGinverse) <- "genoF"}
         # mydataSub2 <- mydataSub[which(mydataSub$predictedValue > 0),]
         mix <- try(
           LMMsolver::LMMsolve(fixed =as.formula(fix),
                               random = as.formula(ranran),
                               residual=ranres,
                               weights = "w",
+                              ginverse = myGinverse,#list(genoF=Ainv),
                               #trace = TRUE,
-                              data = mydataSub, maxit = 100),
+                              data = mydataSub, maxit = maxit),
           silent = TRUE
         )
         if(!inherits(mix,"try-error") ){ # if random model runs well try the fixed model

@@ -16,8 +16,8 @@ nrm <- function(
   mydata <- pedigreeDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(pedigreeDTfile)))
 
   ids <- unique(c(mydata[,"dam"], mydata[,"sire"], mydata[,"indiv"]))
-  idsDf <- data.frame(idsn = 1:length(ids)); rownames(idsDf) <- ids
-  idsDfInverse <- data.frame(ids = ids); rownames(idsDf) <- 1:length(ids)
+  idsDf <- data.frame(idsn = 1:length(ids)); rownames(idsDf) <- as.character(ids)
+  idsDfInverse <- data.frame(ids = ids); rownames(idsDfInverse) <- 1:length(ids)
   orPedN <- apply(mydata,2,function(x){ # not sure why is working for the  "" genotypes but is working :)
     idsDf[as.character(x),]
   })
@@ -34,7 +34,7 @@ nrm <- function(
 
   A <- as.matrix(pedigreemm::getA(ped))
 
-  rownames(A) <- colnames(A) <- idsDfInverse[rownames(A),]
+  rownames(A) <- colnames(A) <- as.character(idsDfInverse[rownames(A),])
   # Ai <-pedigreemm::getAInv(ped)
 
   #########################################

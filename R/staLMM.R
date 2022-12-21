@@ -2,12 +2,10 @@ staLMM <- function(
     phenoDTfile= NULL,
     trait=NULL, # per trait
     fixedTerm=c("1","genoF"),
+    genoAmatrix=NULL,
+    maxit=50,
     verbose=FALSE
 ){
-
-  # if(is.null(wd)){wd <- getwd()}
-  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
 
   id <- paste("sta",idGenerator(5,5),sep="")
   type <- "sta"
@@ -19,10 +17,6 @@ staLMM <- function(
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   mydata <- phenoDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(phenoDTfile)))
   cleaning <- phenoDTfile$outliers #readRDS(file.path(wd,"outliers",paste0(phenoDTfile)))
-  # parameters <- read.csv(file.path(wd,"parameters.csv"))
-  # modeling <- read.csv(file.path(wd,"modeling.csv"))
-  # predictions <- read.csv(file.path(wd,"predictions.csv"))
-  # pipeline_metrics <- read.csv(file.path(wd,"pipeline_metrics.csv"))
 
   traitToRemove <- character()
   for(k in 1:length(trait)){
@@ -31,7 +25,6 @@ staLMM <- function(
         cat(paste0("'", trait[k], "' is not a column in the given dataset. It will be removed from trait list \n"))
       }
       traitToRemove <- c(traitToRemove,trait[k])
-      # stop(paste0("'", trait[k], "' is not a column in the given dataset"))
     }
   }
   trait <- setdiff(trait,traitToRemove)
@@ -42,7 +35,7 @@ staLMM <- function(
   predictionsList <- list(); counter=1
   for(iTrait in trait){ # iTrait=trait[1]
     if(verbose){cat(paste("Analyzing trait", iTrait,"\n"))}
-    for(iField in fields){ # iField = fields[2]# "2019_WS_BINA_Regional_Station_Barishal"
+    for(iField in fields){ # iField = fields[1]# "2019_WS_BINA_Regional_Station_Barishal"
       if(verbose){cat(paste("Analyzing field", iField,"\n"))}
       # subset data
       mydataSub <- droplevels(mydata[which(as.character(mydata$fieldinstF) %in% iField),])
@@ -71,6 +64,7 @@ staLMM <- function(
               badRecords <- which(gridCheck > 1, arr.ind = TRUE)
             }
           }
+
           # find best formula
           mde <- cgiarFTDA::asremlFormula(fixed=as.formula(paste("trait","~ 1")),
                                           random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
@@ -107,59 +101,107 @@ staLMM <- function(
           # randomTerm <- setdiff(randomTerm, fixedTerm)
           ranran <- paste(unique(c(randomTermForRanModel, newRandom)), collapse=" + ")
           ranran <- paste("~",ranran)
+          # do we have replication in the fixed factors to be fitted?
+          repFixedTerm <- apply(data.frame(setdiff(fixedTerm,"1")),1,function(x){length(which(table(mydataSub[,x]) > 1))})
+          repFixedTermGreater <- which(repFixedTerm > 0)
+          #
+          if(is.null(genoAmatrix)){
+            # make sure the matrix only uses the leves for individuals with data
+            genoFlevels <- unique(mydataSub[which(!is.na(mydataSub[,"trait"])),"genoF"])
+            Ainv <- diag(length(genoFlevels))
+            colnames(Ainv) <- rownames(Ainv) <- genoFlevels
+          }else{
+            genoFlevels <- unique(mydataSub[which(!is.na(mydataSub[,"trait"])),"genoF"])
+            A <- genoAmatrix$cleaned
+            inter <- intersect(genoFlevels,colnames(A)) # go for sure
+            differ <- setdiff(inter,genoFlevels) # are missing
+            if(length(inter) > 0){
+              A1 <- A[inter,inter]
+              A1inv <- solve(A1 + diag(1e-5,ncol(A1), ncol(A1)))
+            }else{A1inv <- matrix(0,0,0)}
+            if(length(differ) > 0){
+              A2inv <- diag(length(differ))
+              colnames(A2inv) <- rownames(A2inv) <- differ
+            }else{A2inv <- matrix(0,0,0)}
+            Ainv <- sommer::adiag1(A1inv,A2inv)
+          }
+          upperAcheck <- mean(unlist(Ainv[upper.tri(Ainv, diag=FALSE)]))
+          # print(upperAcheck)
+          # at least one condition met
+          if( (length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0) | (upperAcheck != 0) ){
 
-          mixRandom <- try(
-            LMMsolver::LMMsolve(fixed =as.formula(fix),
-                                random = as.formula(ranran),
-                                spline = newSpline, #trace = TRUE,
-                                data = mydataSub, maxit = 100),
-            silent = TRUE
-          );  # mixRandom <- update(mixRandom, maxiter=5)
-
-          # only keep variance components that were greater than zero
-          if(!inherits(mixRandom,"try-error") ){ # if random model runs well try the fixed model
-            sm <- summary(mixRandom, which = "variances")
-            newRanran <- setdiff((sm[,1])[which(sm[,2] >0.05)],c("residual","genoF"))
-            ranran <- paste("~",paste(c(newRanran), collapse=" + "))
-            if(ranran=="~ "){ranran=NULL}else{ranran <- as.formula(ranran)}
-            rownames(sm) <- NULL
-            if(verbose){
-              print(sm)
-              cat(paste(iTrait," ~",paste(fixedTerm, collapse = " + ")," \n"))
-              cat(paste(ranran,"\n"))
-            }
-            fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
-            mixFixed <- try(
+            mixRandom <- try(
               LMMsolver::LMMsolve(fixed =as.formula(fix),
-                                  random = ranran,
+                                  random = as.formula(ranran),
                                   spline = newSpline, #trace = TRUE,
-                                  data = mydataSub, maxit = 100),
+                                  ginverse = list(genoF=Ainv),
+                                  data = mydataSub, maxit = maxit),
               silent = TRUE
-            )
-            if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
+            );  # mixRandom <- update(mixRandom, maxiter=5)
 
-              predictedValue <- mixFixed$coefficients$genoF + mixFixed$coefficients$`(Intercept)`
-              stdError <- (sqrt(diag(as.matrix(solve(mixFixed$C)))))[1:length(predictedValue)]
-              genoF <- gsub("genoF_","", names(predictedValue))
-              pp <- data.frame(genoF,predictedValue,stdError)
+            # only keep variance components that were greater than zero
+            if(!inherits(mixRandom,"try-error") & ((length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0)) ){ # if random model runs well try the fixed model
+              sm <- summary(mixRandom, which = "variances")
+              newRanran <- setdiff((sm[,1])[which(sm[,2] >0.05)],c("residual","genoF"))
+              ranran <- paste("~",paste(c(newRanran), collapse=" + "))
+              if(ranran=="~ "){ranran=NULL}else{ranran <- as.formula(ranran)}
+              rownames(sm) <- NULL
+              if(verbose){
+                print(sm)
+                cat(paste(iTrait," ~",paste(fixedTerm, collapse = " + ")," \n"))
+                cat(paste(ranran,"\n"))
+              }
+              fix <- paste("trait ~",paste(fixedTerm, collapse = " + "))
+              mixFixed <- try(
+                LMMsolver::LMMsolve(fixed =as.formula(fix),
+                                    random = ranran,
+                                    spline = newSpline, #trace = TRUE,
+                                    data = mydataSub, maxit = maxit),
+                silent = TRUE
+              )
+              if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
+
+                predictedValue <- mixFixed$coefficients$genoF + mixFixed$coefficients$`(Intercept)`
+                stdError <- (sqrt(diag(as.matrix(solve(mixFixed$C)))))[1:length(predictedValue)]
+                genoF <- gsub("genoF_","", names(predictedValue))
+                pp <- data.frame(genoF,predictedValue,stdError)
+                pp$trait <- iTrait
+                pp$fieldinstF <- iField
+                pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
+                if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
+                pp$genoYearTesting <- unique(mydataSub$year)[1]
+                ## heritabilities
+                ss = mixRandom$VarDf#summary(mixRandom, which = "variances")
+                rownames(ss) <- ss$VarComp
+                vg <- ss["genoF",2]; vr <- ss["residual",2]
+                h2[counter] <-  vg / (vg+vr) ; se[counter] <- 0
+                ## reliability
+                pp$rel <- abs(1 - (pp$stdError^2)/(vg))
+                predictionsList[[counter]] <- pp;
+                field[counter] <- iField; trt[counter] <- iTrait
+                counter=counter+1
+
+              } # end of if fixed model run well
+            }else{ # if there was singularities we just take means and assigna h2 of zero
+              if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
+              pp <- aggregate(trait ~ genoF, FUN=mean, data=mydataSub)
+              colnames(pp)[2] <- "predictedValue"
+              pp$stdError <- 1
+              pp$status <- "averaged"
+              pp$rel <- 1e-6
               pp$trait <- iTrait
               pp$fieldinstF <- iField
               pp$entryType <- "test";  areChecks <- which(pp$genoF %in% checks)
               if(length(areChecks) > 0){pp$entryType[areChecks] <- "check"}
               pp$genoYearTesting <- unique(mydataSub$year)[1]
-              ## heritabilities
-              ss = mixRandom$VarDf#summary(mixRandom, which = "variances")
-              rownames(ss) <- ss$VarComp
-              vg <- ss["genoF",2]; vr <- ss["residual",2]
-              h2[counter] <-  vg / (vg+vr) ; se[counter] <- 0
-              ## reliability
-              pp$rel <- abs(1 - (pp$stdError^2)/(vg))
               predictionsList[[counter]] <- pp;
+              h2[counter] <- 1e-6; se[counter] <- 1e-6 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
               field[counter] <- iField; trt[counter] <- iTrait
               counter=counter+1
+            } # end of is mixed model run well
 
-            } # end of if fixed model run well
-          }else{ # if there was singularities we just take means and assigna h2 of zero
+          }else{
+
             if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
             pp <- aggregate(trait ~ genoF, FUN=mean, data=mydataSub)
             colnames(pp)[2] <- "predictedValue"
@@ -175,7 +217,10 @@ staLMM <- function(
             h2[counter] <- 1e-6; se[counter] <- 1e-6 # lm(rr$predictedValue~pp$predictedValue)$coefficients[2]
             field[counter] <- iField; trt[counter] <- iTrait
             counter=counter+1
-          } # end of is mixed model run well
+
+          }
+
+
 
         }
       }
