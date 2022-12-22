@@ -2,7 +2,6 @@ staLMM <- function(
     phenoDTfile= NULL,
     trait=NULL, # per trait
     fixedTerm=c("1","genoF"),
-    genoAmatrix=NULL,
     maxit=50,
     verbose=FALSE
 ){
@@ -88,7 +87,7 @@ staLMM <- function(
 
           newRandom <- ifelse(length(factorsFittedGreater) > 0, names(factorsFitted)[factorsFittedGreater], NA  )
           if(is.na(newRandom)){newRandom=NULL}
-          # Ai <- PED$ginv; attr(Ai, "INVERSE") <- TRUE
+          #
           if((length(mde$used$fieldinstF$rowcoordF) == 0) & (length(mde$used$fieldinstF$colcoordF) == 0)){
             newSpline <- NULL
           }else{
@@ -98,46 +97,24 @@ staLMM <- function(
           randomTermForRanModel <- c(newRandom,"genoF")
           fixedTermForRanModel <- setdiff(fixedTerm,randomTermForRanModel)
           fix <- paste("trait ~",paste(fixedTermForRanModel, collapse = " + "))
-          # randomTerm <- setdiff(randomTerm, fixedTerm)
+          #
           ranran <- paste(unique(c(randomTermForRanModel, newRandom)), collapse=" + ")
           ranran <- paste("~",ranran)
           # do we have replication in the fixed factors to be fitted?
           repFixedTerm <- apply(data.frame(setdiff(fixedTerm,"1")),1,function(x){length(which(table(mydataSub[,x]) > 1))})
           repFixedTermGreater <- which(repFixedTerm > 0)
-          #
-          if(is.null(genoAmatrix)){
-            # make sure the matrix only uses the leves for individuals with data
-            genoFlevels <- unique(mydataSub[which(!is.na(mydataSub[,"trait"])),"genoF"])
-            Ainv <- diag(length(genoFlevels))
-            colnames(Ainv) <- rownames(Ainv) <- genoFlevels
-          }else{
-            genoFlevels <- unique(mydataSub[which(!is.na(mydataSub[,"trait"])),"genoF"])
-            A <- genoAmatrix$cleaned
-            inter <- intersect(genoFlevels,colnames(A)) # go for sure
-            differ <- setdiff(inter,genoFlevels) # are missing
-            if(length(inter) > 0){
-              A1 <- A[inter,inter]
-              A1inv <- solve(A1 + diag(1e-5,ncol(A1), ncol(A1)))
-            }else{A1inv <- matrix(0,0,0)}
-            if(length(differ) > 0){
-              A2inv <- diag(length(differ))
-              colnames(A2inv) <- rownames(A2inv) <- differ
-            }else{A2inv <- matrix(0,0,0)}
-            Ainv <- sommer::adiag1(A1inv,A2inv)
-          }
-          upperAcheck <- mean(unlist(Ainv[upper.tri(Ainv, diag=FALSE)]))
-          # print(upperAcheck)
+
           # at least one condition met
-          if( (length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0) | (upperAcheck != 0) ){
+          if( (length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0) ){
 
             mixRandom <- try(
               LMMsolver::LMMsolve(fixed =as.formula(fix),
                                   random = as.formula(ranran),
                                   spline = newSpline, #trace = TRUE,
-                                  ginverse = list(genoF=Ainv),
+                                  # ginverse = list(genoF=Ainv),
                                   data = mydataSub, maxit = maxit),
               silent = TRUE
-            );  # mixRandom <- update(mixRandom, maxiter=5)
+            );
 
             # only keep variance components that were greater than zero
             if(!inherits(mixRandom,"try-error") & ((length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0)) ){ # if random model runs well try the fixed model
@@ -220,8 +197,6 @@ staLMM <- function(
 
           }
 
-
-
         }
       }
     }
@@ -261,19 +236,15 @@ staLMM <- function(
     geno = NA,  rep	= NA,  block =	NA,rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
-  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(id,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait, traitLb = NA,traitUb = NA,outlierCoef = NA,
     analysisId = id,analysisType = type,fixedModel = fix,
     randomModel = ifelse(is.null(ranran),NA,setdiff(as.character(ranran),"~")),residualModel = "units",h2Threshold = NA
   )
-  # saveRDS(mod, file = file.path(wd,"modeling",paste0(id,".rds")))
-
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  # saveRDS(predictionsBind[,predcols], file = file.path(wd,"predictions",paste0(id,".rds")))
 
   # write pipeline metrics
   pm <- data.frame(value=h2,stdError=se, fieldinst=field,trait=trt,
@@ -282,8 +253,6 @@ staLMM <- function(
                    pipeline=paste(sort(unique(mydata$pipeline)),collapse=", "),
                    stage = paste(sort(unique(predictionsBind$stage)),collapse=", ")
   )
-  # saveRDS(pm, file = file.path(wd,"metrics",paste0(id,".rds")))
-
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
     # cat(paste("Your results will be available in the predictions database under such id \n"))
