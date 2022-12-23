@@ -20,50 +20,59 @@ ammi <- function(phenoDTfile, trait, verbose=TRUE){
 
   percentExplained <- traitNames <- list()
   predictionsList <- list()
-  for(iTrait in trait){ # iTrait=trait[2]
+  for(iTrait in trait){ # iTrait=trait[1]
     mydataSub <- mydata[which(mydata$trait == iTrait),]
 
-    GEmedie <-  reshape(mydataSub[,c("geno","fieldinst","predictedValue")],
-            idvar = "geno", timevar = "fieldinst", v.names = "predictedValue",
-            direction = "wide", sep="_")
-    colnames(GEmedie) <- gsub("predictedValue_","",colnames(GEmedie))
-    GEmedie[,-c(1)] <- apply(GEmedie[,-c(1)],2,sommer::imputev)
-    rownames(GEmedie) <- GEmedie[,1]
-    GEmedie <- as.matrix(GEmedie[,-1])
+    if(verbose){print(paste("Only one environment for trait:",iTrait,". Trait will be skipped."))}
 
-    GE <- as.data.frame(t(scale( t(scale(GEmedie, center=T,scale=F)), center=T, scale=F)))
-    sum(GE^2)
+    if(length(table(mydataSub$fieldinst)) > 1){ # there's enough fields
+      GEmedie <-  reshape(mydataSub[,c("geno","fieldinst","predictedValue")],
+                          idvar = "geno", timevar = "fieldinst", v.names = "predictedValue",
+                          direction = "wide", sep="_")
+      colnames(GEmedie) <- gsub("predictedValue_","",colnames(GEmedie))
+      GEmedie[,-c(1)] <- apply(as.data.frame(GEmedie[,-c(1)]),2,sommer::imputev)
+      rownamesGEmedie <- GEmedie[,1]
+      GEmedie <- as.matrix(GEmedie[,-1])
+      rownames(GEmedie) <- rownamesGEmedie
 
-    U <- svd(GE)$u
-    V <- svd(GE)$v
-    D <- diag(svd(GE)$d)
-    Sg <- U %*% sqrt(D)
-    Se <- V %*% sqrt(D)
-    rownames(Sg) <- rownames(GE)#levels(dataset$Genotype)
-    rownames(Se) <- colnames(GE)#levels(dataset$Environment)
-    colnames(Sg) <- colnames(Se) <- paste("PC", 1:ncol(Se), sep ="")
+      GE <- as.data.frame(t(scale( t(scale(GEmedie, center=T,scale=F)), center=T, scale=F)))
+      sum(GE^2)
 
-    mySum <- numeric()
-    for(PC in 1:ncol(Se)){
-      Sg2 <- as.matrix(Sg[,1:PC])
-      Se2 <- as.matrix(Se[,1:PC])
-      GE2 <- Sg2 %*% t(Se2)
-      mySum[PC] <- sum(GE2^2)
+      U <- svd(GE)$u
+      V <- svd(GE)$v
+      D <- diag(svd(GE)$d)
+      Sg <- U %*% sqrt(D)
+      Se <- V %*% sqrt(D)
+      rownames(Sg) <- rownames(GE)#levels(dataset$Genotype)
+      rownames(Se) <- colnames(GE)#levels(dataset$Environment)
+      colnames(Sg) <- colnames(Se) <- paste("PC", 1:ncol(Se), sep ="")
+
+      mySum <- numeric()
+      for(PC in 1:ncol(Se)){
+        Sg2 <- as.matrix(Sg[,1:PC])
+        Se2 <- as.matrix(Se[,1:PC])
+        GE2 <- Sg2 %*% t(Se2)
+        mySum[PC] <- sum(GE2^2)
+      }
+      percentExplained[[iTrait]] <- mySum/mySum[length(mySum)]
+      genoType <- c(rep("geno",nrow(Sg)), rep("fieldinst",nrow(Se)))
+      biplot <- rbind(Sg,Se)
+      biplotList <- list(); colnamesBiplot <- colnames(biplot); counter1 <- 1
+      for(iCol in 1:ncol(biplot)){
+        biplotList[[counter1]] <- data.frame(analysisId=id, pipeline=paste(unique(mydata$pipeline), collapse = ", "),
+                                             trait=paste(iTrait,colnamesBiplot[iCol], sep="-"), geno=rownames(biplot),
+                                             genoType=genoType,fieldinst="across", predictedValue=biplot[,iCol],
+                                             stdError=1, rel=1
+        ); counter1 <- counter1+1
+      }
+      predictionsList[[iTrait]] <- do.call(rbind,biplotList)
+      traitNames[[iTrait]] <- unique(predictionsList[[iTrait]]$trait)
+
     }
-    percentExplained[[iTrait]] <- mySum/mySum[length(mySum)]
-    genoType <- c(rep("geno",nrow(Sg)), rep("fieldinst",nrow(Se)))
-    biplot <- rbind(Sg,Se)
-    biplotList <- list(); colnamesBiplot <- colnames(biplot); counter1 <- 1
-    for(iCol in 1:ncol(biplot)){
-      biplotList[[counter1]] <- data.frame(analysisId=id, pipeline=paste(unique(mydata$pipeline), collapse = ", "),
-                                           trait=paste(iTrait,colnamesBiplot[iCol], sep="-"), geno=rownames(biplot),
-                                           genoType=genoType,fieldinst="across", predictedValue=biplot[,iCol],
-                                           stdError=1, rel=1
-      ); counter1 <- counter1+1
-    }
-    predictionsList[[iTrait]] <- do.call(rbind,biplotList)
-    traitNames[[iTrait]] <- unique(predictionsList[[iTrait]]$trait)
   }
+
+  if(length(predictionsList) == 0){stop("No traits with more than 1 fieldinst. Analysis stopped.", call. = FALSE)}
+
   predictionsBind <- do.call(rbind, predictionsList)
   ##########################################
   ## add year of origin, stage and geno code
