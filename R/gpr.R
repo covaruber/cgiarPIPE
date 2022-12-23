@@ -32,7 +32,7 @@ gpr <- function(
   ## genomic prediction analysis
   predictionsBindList <- list()
   for(iTrait in trait){ #  iTrait = trait[1]
-    print(iTrait)
+    # print(iTrait)
     mydataTPprov <- mydataTP[which(mydataTP$trait %in% iTrait & mydataTP$fieldinst %in% fieldinst),]
     common <- unique(intersect(colnames(mydataPP), mydataTPprov[,"geno"])) # common markers
     M <- mydataPP[,common] # PP subset with markers in common

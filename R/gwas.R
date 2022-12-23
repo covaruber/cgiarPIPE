@@ -7,10 +7,6 @@ gwas <- function(
     # wd=NULL
 ){
 
-  # if(is.null(wd)){wd <- getwd()}
-  # md <- strsplit(wd,"/")[[1]]; md <- md[length(md)]
-  # if(md != "DB"){stop("Please set your working directory to the DB folder", call. = FALSE)}
-
   baseId <- idGenerator(5,5)
   idmes <- paste("mes",baseId,sep="")
   idhits <- paste("gwa",baseId,sep="")
@@ -19,16 +15,10 @@ gwas <- function(
   if(is.null(phenoDTfile)){stop("Please provide the predictions", call. = FALSE)}
   if(is.null(markerDTfile)){stop("Please provide the markers", call. = FALSE)}
   if(is.null(trait)){stop("Please provide traits to be analyzed", call. = FALSE)}
-  # if(length(trait) > 1){
-  #   stop(paste0(" Only one trait can be used for optimal contribution. We suggest using an index"), call. = FALSE)
-  # }
 
   ############################
   # loading the dataset
   mydata <- phenoDTfile$predictions # readRDS(file.path(wd,"predictions",paste0(phenoDTfile)))
-
-  # ava.files <- dir(file.path(wd,"files_cleaned"))
-  # if(!paste0(markerDTfile) %in% ava.files){stop("markerDTfile is not present in the files_cleaned folder. Please check the name of your file and its location",call. = FALSE)}
   myrel <- markerDTfile$cleaned # readRDS(file.path(wd,"files_cleaned",paste0(markerDTfile)))
 
   utraits <- unique(mydata$trait)
@@ -55,7 +45,7 @@ gwas <- function(
   ## ocs analysis
   predictionsBindMesList <- predictionsBindHitsList <- list()
   for(iTrait in trait){ #  iTrait = trait[3]
-    print(iTrait)
+    # print(iTrait)
     mydataSub <- mydata[which(mydata$trait == iTrait),]
     n <- nrow(mydataSub) # to be used for degrees of freedom
     k <- 1 # to be used for degrees of freedom (number of levels in fixed effects)
@@ -81,7 +71,6 @@ gwas <- function(
 
     rel <- 1 - (se.a.from.g^2)/as.numeric(mixGBLUP$sigma$`u:geno`)
     # plot(minusLog10pvalGBLUP)
-    # write predictions
 
     predictionsBindMesList[[iTrait]] <- data.frame(analysisId=idmes, pipeline= paste(sort(unique(mydataSub$pipeline)),collapse=", "),
                                   trait=trait, genoCode=1:nrow(a.from.g), geno=rownames(a.from.g),
@@ -101,9 +90,6 @@ gwas <- function(
   predictionsBindHits <- do.call(rbind, predictionsBindHitsList)
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  # saveRDS(predictionsBindMes[,predcols], file = file.path(wd,"predictions",paste0(idmes,".rds")))
-  # saveRDS(predictionsBindHits[,predcols], file = file.path(wd,"predictions",paste0(idhits,".rds")))
-
   #########################################
   ## update databases
   ## write the parameters to the parameter database
@@ -119,10 +105,6 @@ gwas <- function(
     rowcoord =	NA,  colcoord = NA,
     stage = paste(sort(unique(predictionsBindMes$stage)),collapse=", ")
   )
-  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(idmes,".rds")))
-  # db.params$analysisId <- idhits
-  # db.params$analysisType <- typehits
-  # saveRDS(db.params, file = file.path(wd,"metadata",paste0(idhits,".rds")))
   ## write the values used for cleaning to the modeling database
   mod <- data.frame(
     trait = trait,
@@ -136,11 +118,6 @@ gwas <- function(
     residualModel = NA,
     h2Threshold = NA
   )
-  # saveRDS(mod, file = file.path(wd,"modeling",paste0(idmes,".rds")))
-  # mod$analysisId <- idhits
-  # mod$analysisType <- typehits
-  # saveRDS(mod, file = file.path(wd,"modeling",paste0(idhits,".rds")))
-
   # write pipeline metrics
   if(verbose){
     cat(paste("Your analysis id is:",idmes,"\n"))
