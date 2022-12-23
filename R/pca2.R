@@ -1,6 +1,5 @@
-pca <- function(
-    markerDTfile= NULL,
-    minMAF = 0.01,
+pca2 <- function(
+    relDTfile= NULL,
     nPC=3,
     verbose=FALSE
 ){
@@ -10,19 +9,16 @@ pca <- function(
 
   ############################
   # loading the dataset
-  if (is.null(markerDTfile)) stop("No input marker data file specified.")
-  M0 <- markerDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(markerDTfile)))
+  if (is.null(relDTfile)) stop("No input marker data file specified.")
+  M0 <- relDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(relDTfile)))
 
   ############################
   # do PCA
-  mark5 <- M0$M + 1
-  MAF <- apply(mark5,2,function(x){y <- mean(x)/2; return(min(y,1-y))})
-  mark6 <- mark5[,which(MAF>minMAF)]
-  gid <- rownames(mark6)
+  gid <- rownames(M0)
   n.gid <- length(gid)
 
   #PCA
-  mark6.centered <- scale(mark6,center=T,scale=F)
+  mark6.centered <- scale(M0,center=T,scale=F)
   mark.svd <- svd(mark6.centered)
   percentExplained <- (mark.svd$d^2/sum(mark.svd$d^2))*100
   # plot(mark.svd$d^2/sum(mark.svd$d^2),ylab="Fraction Variation Explained")
@@ -31,7 +27,6 @@ pca <- function(
   # ... since the linear transformation M is applied to V)
   pca <- mark6.centered %*% mark.svd$v[,ix]
   colnames(pca) <- paste0("PC",1:ncol(pca))
-
   if(nPC > ncol(pca)){nPC <- ncol(pca)}
 
   pcaList <- list(); colnamespca <- colnames(pca); counter1 <- 1
@@ -62,7 +57,7 @@ pca <- function(
     analysisType =	type,
     fieldbooks	= NA,
     phenoDataFile =	NA,
-    markerbooks	= NA,  markerDataFile =	markerDTfile$id,
+    markerbooks	= NA,  markerDataFile =	relDTfile$id,
     year = NA,  season =	NA,  location =	NA,
     country	= NA,  trial	= NA,  design =	NA,
     geno = NA,  rep	= NA,  block =	NA,
