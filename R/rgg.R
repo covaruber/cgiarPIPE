@@ -27,13 +27,13 @@ rgg <- function(
   # past.anid <- parameters[which(parameters$analysisId %in% current.anid),"phenoDataFile"]
   # mydata2 <- readRDS(file.path(wd,"predictions",paste0(past.anid)))
 
-  if(length(unique(mydata$genoYearOrigin)) == 1){stop("Only one year of data. Realized genetic gain analysis cannot proceed.", call. = FALSE)}
+  if(length(unique(na.omit(mydata$genoYearOrigin))) == 1){stop("Only one year of data. Realized genetic gain analysis cannot proceed.", call. = FALSE)}
   ############################
   ## gg analysis
   gg <- ggp <- inter <- gg.y1 <- gg.yn <- segp <- seb1 <- seb0 <- r2 <- pv <- ntrial <- ntrial.se <- numeric();
   field <- trt <- vector()
   counter=1
-  for(iTrait in trait){ # iTrait="GYKGPHA"
+  for(iTrait in trait){ # iTrait="GY"
     if(verbose){
       cat(paste("Analyzing trait", iTrait,"\n"))
     }
