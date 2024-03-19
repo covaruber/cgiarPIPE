@@ -1,0 +1,17 @@
+importFrom("grDevices", "dev.cur", "dev.new", "dev.next", "dev.set")
+importFrom("graphics", "axis", "lines", "par", "points", "title")
+importFrom("stats", "cov", "dist", "median", "model.matrix", "optimize", "pbeta", "ppoints", "predict", "smooth.spline","var")
+export(
+       idGenerator, desire, geneticEvaluation, geneticEvaluation2,
+       cleanp, cleanm, cleanmHMP, imputeM, cleanr, cleanrQBMS, cleanOutl, f1verif, cleanFields,
+       grm, nrm, hrm,
+       sta, staLMM, met, metLMM, metBigSommer, metCvLMM, ammi, corLMM, index, multIndex, ocs,
+       rgg, pgg, calcNe, neMarker,
+       p3dSommer, gwas, gwasLMM, gpr, mabc,
+       pca, pca2, pcaPheno, hetf,
+       pcheck, trans, transRaw, rbindp, rbindm, transMarkerSingle, sampTrials,  scm,
+       terraExtract, gdd, tpeDef,
+       corImputation,  build.HMM, redmm
+       )
+
+
