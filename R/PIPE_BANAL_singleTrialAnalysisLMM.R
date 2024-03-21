@@ -8,10 +8,10 @@ staLMM <- function(
     returnFixedGeno=TRUE,
     verbose=TRUE
 ){
-  ## THIS FUNCTION CALCULATES A SINGLE TRIAL ANALYSIS FOR MULTIPLE FIELDS AND TRAITS 
+  ## THIS FUNCTION CALCULATES A SINGLE TRIAL ANALYSIS FOR MULTIPLE FIELDS AND TRAITS
   ## IS USED IN THE BANAL APP UNDER THE GENETIC EVALUATION MODULES
   id <- paste( paste("sta",idGenerator(5,5),sep=""), phenoDTfile$idOriginal, sep = "_")
-  
+
   fixedTerm <- unique(c(fixedTerm,"genoF"))
   type <- "sta"
   if(is.null(phenoDTfile)){stop("Please provide the name of the file to be used for analysis", call. = FALSE)}
@@ -23,13 +23,13 @@ staLMM <- function(
   # loading the dataset
   if (is.null(phenoDTfile)) stop("No input phenotypic data file specified.")
   mydata <- phenoDTfile$cleaned #readRDS(file.path(wd,"files_cleaned",paste0(phenoDTfile)))
-  
+
   cleaning <- phenoDTfile$outliers #readRDS(file.path(wd,"outliers",paste0(phenoDTfile)))
   for(iName in c("geno","mother","father")){
     # also the ones that are already factors
     mydata[,paste0(iName,"F")] <- as.factor(mydata[,iName])
   }
-  
+
   traitToRemove <- character()
   for(k in 1:length(trait)){
     if (!trait[k] %in% colnames(mydata)){
@@ -45,13 +45,13 @@ staLMM <- function(
   fixedFormulaForFixedModel = NULL
   randomFormulaForFixedModel = NULL
   fields <- as.character(unique(mydata$fieldinstF))
-  
+
   if(length(fields) == nrow(mydata)){
-    stop("The number of fieldinst levels is equal to the number of records/rows in the dataset. 
-          This means that probably you didn't select the right columns to define the fieldinst column. 
+    stop("The number of fieldinst levels is equal to the number of records/rows in the dataset.
+          This means that probably you didn't select the right columns to define the fieldinst column.
           Please match again your raw file checking carefully the columns defining the fieldinst.", call.=FALSE )
   }
-  
+
   h2 <- se <- cv <- r2 <- r2se <- numeric(); field <- trt <- vector(); diagnostic <- character()
   predictionsList <- list(); counter=1
   library(LMMsolver)
@@ -71,7 +71,7 @@ staLMM <- function(
       # check the genetic units
       nLevelsGenounit <- apply(data.frame(genoUnit),1,function(x){length(table(mydataSub[,x])) }); names(nLevelsGenounit) <- genoUnit
       genoUnitTraitField <- names(nLevelsGenounit)[which(nLevelsGenounit > 1)]
-      
+
       if(length(out) > 0){mydataSub[out,"trait"] <- NA}
       # do analysis
       if(!is.na(var(mydataSub[,"trait"],na.rm=TRUE))){ # if there's variance
@@ -81,7 +81,7 @@ staLMM <- function(
             # try to fix assuming they jusy have the rows and cols by replicate
             badRecords <- which(gridCheck > 1, arr.ind = TRUE)
             if(nrow(badRecords) > 0){
-              mydataSub <- cgiarBase::fixCoords(mydataSub)
+              mydataSub <- cgiarBase::fixCoords( mydataSub=mydataSub, rowcoord="rowcoord", colcoord="colcoord", rep="rep" )
             }
             # make the check once again in case that didn't help
             gridCheck <- with(mydataSub,table(rowcoord,colcoord))
@@ -94,28 +94,28 @@ staLMM <- function(
               mydataSub$colcoordF <- NA
             }
           }
-          
+
           # find best experimental design formula
           mde <- cgiarFTDA::asremlFormula(fixed=as.formula(paste("trait","~ 1")),
                                           random=~ at(fieldinstF):rowcoordF + at(fieldinstF):colcoordF + at(fieldinstF):trialF + at(fieldinstF):repF + at(fieldinstF):blockF,
                                           rcov=~at(fieldinstF):id(rowcoordF):id(colcoordF),
                                           dat=droplevels(mydataSub[which(!is.na(mydataSub[,"trait"])),]),
-                                          
+
                                           minRandomLevels=list(rowcoordF= 3, colcoordF=3, trialF=2,repF=2, blockF=4),
                                           minResidualLevels=list(rowcoordF=5, colcoordF=5),
-                                          
+
                                           exchangeRandomEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                                          
+
                                           exchangeResidualEffects=list(rowcoordF="colcoordF", colcoordF="rowcoordF"),
-                                          
+
                                           customRandomLevels=NULL, customResidualLevels=NULL,
-                                          
+
                                           xCoordinate= "rowcoordF",yCoordinate ="colcoordF",
                                           doubleConstraintRandom=c("rowcoordF","colcoordF"), verbose=verbose)
-          
+
           factorsFitted <- unlist(lapply(mde$used$fieldinstF,length))
           factorsFittedGreater <- which(factorsFitted > 0)
-          
+
           newRandom <- ifelse(length(factorsFittedGreater) > 0, TRUE, FALSE  )
           if(newRandom){newRandom <- names(factorsFitted)[factorsFittedGreater]}else{newRandom<-NULL}
           #
@@ -124,7 +124,7 @@ staLMM <- function(
           }else{
             newSpline = as.formula("~spl2D(x1 = rowcoord, x2 = colcoord, nseg = c(10, 10))")
           }
-          
+
           for(iGenoUnit in genoUnitTraitField){ # iGenoUnit <- genoUnitTraitField[1]
             myGeneticUnit <-  iGenoUnit
             randomTermForRanModel <- c(newRandom,genoUnit)
@@ -141,7 +141,7 @@ staLMM <- function(
               repFixedTerm <- character()
             }
             repFixedTermGreater <- which(repFixedTerm > 0)
-            
+
             # impute fixed effect columns if they are numeric
             toImpute <- unlist(lapply(mydataSub[,setdiff(fixedTermForRanModel,"1"),drop=FALSE], class))
             keepToImpute <- which(toImpute %in% "numeric")
@@ -149,10 +149,10 @@ staLMM <- function(
               toImpute <- names(toImpute[keepToImpute])
               for(iImpute in toImpute){mydataSub[, iImpute] <- sommer::imputev(mydataSub[, iImpute])}
             }
-            
+
             # at least one condition met: replicated random terms, or replicated fixed terms
             if( (length(factorsFittedGreater) > 0) | (length(repFixedTermGreater) > 0) ){
-              
+
               mixRandom <- try(
                 LMMsolver::LMMsolve(fixed =as.formula(fixedFormulaForRanModel),
                                     random = as.formula(randomFormulaForRanModel),
@@ -170,7 +170,7 @@ staLMM <- function(
                 ##
                 sm <- summary(mixRandom, which = "variances")
                 newRanran <- setdiff( (sm[,1])[which(sm[,2] >0.05)] , c("residual",genoUnitTraitField,"s(rowcoord, colcoord)"))
-                
+
                 ranran <- paste("~",paste(c(newRanran), collapse=" + "))
                 if(ranran=="~ "){randomFormulaForFixedModel=NULL}else{randomFormulaForFixedModel <- as.formula(ranran)}
                 rownames(sm) <- NULL
@@ -205,10 +205,10 @@ staLMM <- function(
                     start <- sum(dims[1:(which(dims$Term == iGenoUnit) - 1),"Model"]) + 1 # we add the one when is random
                     pev <- as.matrix(solve(mixRandom$C))[start:(start+length(predictedValue)-1),start:(start+length(predictedValue)-1)]
                     stdError <- stdErrorRandom <- (sqrt(diag(pev)))
-                    
+
                     badSEs <- which( stdError < (sd(predictedValue, na.rm = TRUE)/100) )
                     if(length(badSEs) > 0){stdError[badSEs] <- sd(predictedValue, na.rm = TRUE)}
-                    
+
                     genoF <- gsub(paste0(iGenoUnit,"_"),"", names(mixRandom$ndxCoefficients[[iGenoUnit]]))
                     pp <- data.frame(genoF,predictedValue,stdError)
                     pp$trait <- iTrait
@@ -234,7 +234,7 @@ staLMM <- function(
                     pp$predictedValue <- pp$predictedValue/pp$rel
                     r2[counter] <- mean(pp$rel)
                     r2se[counter] <- sd(pp$rel, na.rm = TRUE)/sqrt(length(pp$rel))
-                    
+
                     # pp$rel <- abs(1 - (stdErrorRandom^2)/(vg))
                     badRels <- which(pp$rel > 1); if(length(badRels) > 0){pp$rel[badRels] <- 0.9999}
                     predictionsList[[counter]] <- pp;
@@ -244,7 +244,7 @@ staLMM <- function(
                 }
                 ##################################################################
                 if(!inherits(mixFixed,"try-error") ){ # if fixed model was not singular save all results
-                  
+
                   if(returnFixedGeno){ # user wants fixed effect predictions for genotype
                     shouldBeOne <- which(mixFixed$ndxCoefficients[[iGenoUnit]] == 0)
                     if(length(shouldBeOne) > 0){mixFixed$ndxCoefficients[[iGenoUnit]][shouldBeOne] = 1}
@@ -289,7 +289,7 @@ staLMM <- function(
                   vg <- ss[iGenoUnit,2]; vr <- ss["residual",2]
                   h2[counter] <-  vg / (vg+vr) ; se[counter] <- 0
                   cv[counter] <- (sd(pp$predictedValue,na.rm=TRUE)/mean(pp$predictedValue,na.rm=TRUE))*100
-                  
+
                   ## reliability
                   A <- diag(nrow(pev))
                   G <- A*vg # G matrix
@@ -297,12 +297,12 @@ staLMM <- function(
                   pp$rel <- diag(R2)
                   r2[counter] <- mean(pp$rel)
                   r2se[counter] <- sd(pp$rel, na.rm = TRUE)/sqrt(length(pp$rel))
-                  
+
                   badRels <- which(pp$rel > 1); if(length(badRels) > 0){pp$rel[badRels] <- 0.9999}
                   predictionsList[[counter]] <- pp;
                   field[counter] <- iField; trt[counter] <- iTrait
                   counter=counter+1
-                  
+
                 } # end of if fixed model run well
               }else{ # if there was singularities we just take means and assigna h2 of zero
                 if(verbose){cat(paste("No design to fit or singularities encountered in the random model, aggregating and assuming h2 = 0 \n"))}
@@ -327,9 +327,9 @@ staLMM <- function(
                 r2se[counter] <- 1e-6
                 counter=counter+1
               } # end of is mixed model run well
-              
+
             }else{
-              
+
               if(verbose){cat(paste("No design to fit, aggregating and assuming h2 = 0 \n"))}
               pp <- aggregate(as.formula(paste("trait ~", iGenoUnit)), FUN=mean, data=mydataSub)
               colnames(pp)[2] <- "predictedValue"
@@ -351,16 +351,16 @@ staLMM <- function(
               r2[counter] <- 1e-6
               r2se[counter] <- 1e-6
               counter=counter+1
-              
+
             }
-            
+
           }
-          
-          
+
+
         }else{
-          
+
           for(iGenoUnit in genoUnitTraitField){
-            
+
             if(verbose){
               cat(paste("No design to fit, aggregating for predicted values, std. errors assumed equal to std. deviation of the trial. In addition assuming h2 = 0 for the trial \n"))
             }
@@ -383,7 +383,7 @@ staLMM <- function(
             r2[counter] <- 1e-6
             r2se[counter] <- 1e-6
             counter=counter+1
-            
+
           }
         }
       }
@@ -430,7 +430,7 @@ staLMM <- function(
   if(length(which(is.na(predictionsBind$stage))) < length(predictionsBind$stage)){predictionsBind$stage <- sommer::imputev(predictionsBind$stage)}
   if(length(which(is.na(predictionsBind$genoCode))) < length(predictionsBind$genoCode)){predictionsBind$genoCode <- sommer::imputev(predictionsBind$genoCode)}
   if(length(which(is.na(predictionsBind$genoYearOrigin))) < length(predictionsBind$genoYearOrigin)){predictionsBind$genoYearOrigin <- sommer::imputev(predictionsBind$genoYearOrigin)}
-  
+
   ##########################################
   ## update databases
   ## write the parameters to the parameter database
@@ -451,7 +451,7 @@ staLMM <- function(
   # write predictions
   predcols <- c("analysisId", "pipeline","trait","genoCode","geno","mother","father","genoType","genoYearOrigin",
                 "genoYearTesting", "fieldinst","predictedValue","stdError","rel","stage")
-  
+
   # write pipeline metrics
   metrics <- data.frame(value=c(h2,cv, r2),stdError=c(se,rep(NA,length(cv)),r2se), fieldinst=c(field,field,field),trait=c(trt,trt,trt),
                    analysisId=id, method=c(rep("vg/(vg+ve)",length(h2)), rep("sd/mu", length(cv)), rep("(G-PEV)/G", length(r2)) ),
@@ -463,7 +463,7 @@ staLMM <- function(
   if(verbose){
     cat(paste("Your analysis id is:",id,"\n"))
   }
-  
+
   if(is.null(phenoDTfile$metadataFieldinst)){
     metadataFieldinst=NA
   }else{
